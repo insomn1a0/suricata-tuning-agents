@@ -4,6 +4,14 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Engine versions come from tools/kitconfig.py (single source); actions are pinned by commit SHA.
 jobs:
   static:
     runs-on: ubuntu-latest
@@ -11,8 +19,8 @@ jobs:
       matrix:
         python: ["3.10", "3.12"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python }}
       - run: make lint test-unit demo
@@ -21,14 +29,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: static
     steps:
-      - uses: actions/checkout@v4
-      - run: docker pull wazuh/wazuh-manager:4.14.5
-      - run: make test-logtest WAZUH_VERSION=4.14.5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: make test-logtest
 
   suricata-pcap:
     runs-on: ubuntu-latest
     needs: static
     steps:
-      - uses: actions/checkout@v4
-      - run: docker pull jasonish/suricata:8.0
-      - run: make test-pcap SURICATA_VERSION=8.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: make test-pcap
