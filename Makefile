@@ -8,7 +8,7 @@ export PY
 
 help:
 	@echo "make demo          synthetic two-week dataset -> snapshots -> diff (no sensor, no Docker)"
-	@echo "make lint          static checks of wazuh/rules"
+	@echo "make lint          static checks of wazuh/rules + lab-data-only guard"
 	@echo "make test-unit     unit tests (stdlib only)"
 	@echo "make test-logtest  Wazuh logtest in Docker (wazuh/wazuh-manager:\$$WAZUH_VERSION)"
 	@echo "make test-pcap     Suricata pcap tests in Docker (jasonish/suricata:\$$SURICATA_VERSION)"
@@ -24,6 +24,7 @@ demo:
 
 lint:
 	$(PY) tools/lint_rules.py
+	$(PY) tools/check_lab_data.py
 
 test-unit:
 	$(PY) -m unittest discover -s tests/unit -t .
