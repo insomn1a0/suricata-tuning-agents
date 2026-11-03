@@ -14,7 +14,7 @@ ALLOWED_NETS = [ipaddress.ip_network(n) for n in
                 ("10.10.0.0/16", "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "127.0.0.0/8", "0.0.0.0/32")]
 IPV4 = re.compile(r"(?<![\w.])\d{1,3}(?:\.\d{1,3}){3}(?:/\d{1,2})?(?!\.?\d)")  # not part of 1.2.3.4.5
 ALLOW = "lab-data: allow"
-HOST = re.compile(r"\b((?:[a-z0-9-]+\.)+(?:local|lan|corp|internal|intra))\b", re.I)
+HOST = re.compile(r"\b((?:[a-z0-9-]+\.)+(?:local|lan|corp|internal|intra))\b(?!\.[a-z])", re.I)  # not settings.local.json
 
 
 def ip_findings(line):
