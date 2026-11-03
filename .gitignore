@@ -16,3 +16,6 @@ __pycache__/
 
 # Local virtualenv (make venv)
 /.venv/
+
+# Claude Code agent worktrees
+/.claude/worktrees/

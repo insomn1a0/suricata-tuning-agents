@@ -15,6 +15,11 @@ Never edit `wazuh/rules/100220-suricata_tuning.xml`, `suricata/generated/` or `t
    - `routes`: the exact verified contexts. Several routes = a union; each becomes its own rule, so `(A->X) or
      (B->Y)` never turns into a Cartesian product. A list inside one route is a deliberate product.
    - `rationale`, `risk`, `compensating_control`, `card` are required - they go into the rule comment.
+   - `status: approved` is required (a draft is never rendered); `metadata` is the SID's real
+     `signature_severity`/`confidence` from the rule text - it decides the ladder parent, and `wazuh.parent`
+     must be that leaf. `lower` needs `dst` + `dst_port` and level >= 1; `rate_limit` only for `enrich`,
+     one address per route. Routes of different intents must not overlap: Wazuh picks among siblings by
+     level (level 0 first, then higher), not by file order.
    - Rule IDs from `$RULE_ID_RANGE`, free in the repo, the registry (`wazuh/README.md`, never reuse retired
      IDs) and the stock rules of the same version:
      `docker run --rm --entrypoint "" wazuh/wazuh-manager:$WAZUH_VERSION sh -c 'grep -rhoE "id=\"1[0-9]{5}\"" /var/ossec/ruleset/rules/'`.

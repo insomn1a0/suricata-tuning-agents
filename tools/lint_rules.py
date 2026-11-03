@@ -1,7 +1,7 @@
 """Static checks for wazuh/rules/*.xml - fast, no Wazuh needed (evidence label: static).
 - XML parses; rule IDs unique and inside the registry range (RULE_ID_RANGE, default 100200-100299)
 - every <if_sid> points to a rule in this repo or to an allowed stock parent
-- tuning rules (level < 6 or with ignore/frequency) pin alert.signature_id with an anchored pcre2 regex
+- tuning rules (level < WAZUH_ALERT_LEVEL or with ignore/frequency) pin alert.signature_id, anchored pcre2
 - every pcre2 field regex is anchored (^...$) unless it is explicitly case-insensitive domain matching, and an
   alternation is grouped: ^a|b$ means (^a)|(b$) and also matches 'a...' and '...b'
 - descriptions contain no literal IPv4 addresses (use $(src_ip)/$(dest_ip))
@@ -44,8 +44,9 @@ def load(path):
     return ET.fromstring(f"<root>{text}</root>")
 
 
-def lint(paths, id_range):
+def lint(paths, id_range, alert_level=None):
     lo, hi = id_range
+    alert_level = alert_level if alert_level is not None else int(kitconfig.load()["WAZUH_ALERT_LEVEL"])
     rules, findings = {}, []
     for path in paths:
         try:
@@ -66,8 +67,8 @@ def lint(paths, id_range):
                 findings.append(f"{path}: rule {rid} if_sid {parent} not found")
         fields = {f.get("name"): f for f in r.findall("field")}
         level = int(r.get("level", "0"))
-        tuning = level < 6 or r.get("ignore") or r.get("frequency")
-        if tuning and r.findtext("if_sid") not in STOCK_PARENTS:
+        tuning = level < alert_level or r.get("ignore") or r.get("frequency")
+        if tuning:  # also under a stock parent: an unpinned low-level child of 86601 hides everything
             sid = fields.get("alert.signature_id")
             if sid is None or sid.get("type") != "pcre2" or not re.fullmatch(r"\^.+\$", sid.text or ""):
                 findings.append(f"{path}: tuning rule {rid} must pin alert.signature_id with anchored pcre2")

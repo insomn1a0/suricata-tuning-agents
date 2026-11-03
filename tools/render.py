@@ -4,20 +4,23 @@ Backends:
   wazuh4-xml          lower/enrich/raise -> wazuh/rules/100220-suricata_tuning.xml (one rule per route)
   suricata-threshold  suppress -> suricata/generated/threshold.config, disable -> suricata/generated/disable.conf
   wazuh5              not implemented: Wazuh 5 drops XML rules; the adapter waits for a documented GA format
-Tests: tests/logtest/intent-<id>.{txt,expect} - positives plus generated negatives (neighbour SID, prefix
-addresses, reverse direction, other port, crossed route pairs), expected outcome from a small model of the
-rules that Wazuh logtest then confirms or refutes.
+Tests: tests/logtest/intent-<id>.{txt,expect} - positives plus generated negatives (neighbour and look-alike
+SIDs, prefix addresses, reverse direction, other port/protocol, crossed route pairs). Test events carry the
+SID's real metadata from the intent; the expected outcome comes from a model of how Wazuh selects among
+siblings (level 0 first, then higher levels, then file order - verified on 4.14.9), which logtest then confirms.
 
 Usage: render.py            write all generated files
        render.py --check    exit 1 if any generated file is missing or differs (CI)
        render.py --backend wazuh5"""
 import argparse
+import ipaddress
 import itertools
 import json
 import pathlib
 import re
 import sys
 import xml.etree.ElementTree as ET
+from xml.sax.saxutils import escape
 
 import yaml
 
@@ -27,6 +30,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 INTENTS = ROOT / "tuning" / "intents"
 SCHEMA = ROOT / "tuning" / "schema.json"
 LADDER = ROOT / "wazuh" / "rules" / "100200-suricata_rules.xml"
+REGISTRY = ROOT / "wazuh" / "README.md"
 WAZUH_OUT = ROOT / "wazuh" / "rules" / "100220-suricata_tuning.xml"
 SURICATA_OUT = ROOT / "suricata" / "generated"
 TESTS_OUT = ROOT / "tests" / "logtest"
@@ -35,6 +39,8 @@ ROUTE_FIELDS = (("src", "src_ip"), ("dst", "dest_ip"), ("src_port", "src_port"),
                 ("proto", "proto"))
 DEFAULT_EVENT = {"src": "10.10.100.21", "dst": "10.10.0.99", "src_port": 50000, "dst_port": 445, "proto": "TCP"}
 SIEM_ACTIONS = {"lower", "enrich", "raise"}
+RESERVED_IDS = range(100207, 100220)  # ladder extensions, see wazuh/README.md
+MAX_ADDRESSES = 8  # per field and route; a wider context is a different decision, not a longer list
 
 
 class IntentError(Exception):
@@ -90,22 +96,100 @@ def as_list(v):
     return v if isinstance(v, list) else [v]
 
 
-def check_semantics(intent, alert_level):
-    """Rules the schema cannot express. Each one encodes a lesson from docs/PLAYBOOK.md."""
+# ---------- ladder model: how Wazuh selects among siblings ----------
+
+def engine_key(level, order):
+    """Wazuh 4.x evaluates sibling rules level 0 first, then by descending level; file order breaks ties.
+    (Observed on 4.14.9 - a lower placed before a raise does not win.)"""
+    return (0 if level == 0 else 1, -level, order)
+
+
+def ladder():
+    """Rule id -> {level, parent, fields, order} for the hand-written ladder, plus stock 86601."""
+    root = ET.fromstring(f"<root>{LADDER.read_text()}</root>")
+    rules = {"86601": {"level": 3, "parent": None, "fields": {}, "order": -1}}
+    for n, r in enumerate(root.iter("rule")):
+        rules[r.get("id")] = {"level": int(r.get("level")), "parent": r.findtext("if_sid"),
+                              "fields": {f.get("name"): f.text for f in r.findall("field")}, "order": n}
+    return rules
+
+
+def children(rules, parent):
+    kids = [rid for rid, r in rules.items() if r["parent"] == str(parent)]
+    return sorted(kids, key=lambda rid: engine_key(rules[rid]["level"], rules[rid]["order"]))
+
+
+def ladder_select(rules, metadata):
+    """The ladder rule an alert with this metadata lands on (before any tuning rule)."""
+    node = "86601"
+    while True:
+        for kid in children(rules, node):
+            want = {k.split(".", 2)[2]: v for k, v in rules[kid]["fields"].items() if k.startswith("alert.metadata.")}
+            if all(metadata.get(k) == v for k, v in want.items()):
+                node = kid
+                break
+        else:
+            return node
+
+
+# ---------- semantic checks ----------
+
+def canonical_ip(value):
+    try:
+        return str(ipaddress.ip_address(value)) == value
+    except ValueError:
+        return False
+
+
+def routes_overlap(a, b):
+    """Could one event match both routes? A field missing on one side matches anything."""
+    return all(set(map(str, as_list(a[k]))) & set(map(str, as_list(b[k]))) for k, _ in ROUTE_FIELDS
+               if k in a and k in b)
+
+
+def check_semantics(intent, alert_level, rules=None):
+    """Rules the schema cannot express. Each one encodes a lesson from docs/PLAYBOOK.md or a review finding."""
+    rules = rules or ladder()
     errors, action, routes = [], intent["action"], intent.get("routes", [])
+    for route in routes:
+        for key in ("src", "dst"):
+            ips = as_list(route.get(key, []))
+            if any(not canonical_ip(ip) for ip in ips):
+                errors.append(f"{key} {ips}: addresses must be valid and canonical (10.10.20.15, not 010.010.020.015)")
+            if len(ips) > MAX_ADDRESSES:
+                errors.append(f"{key}: {len(ips)} addresses in one route - a context that wide is a different decision")
     if action in SIEM_ACTIONS:
-        for key in ("routes", "level", "description", "wazuh"):
+        for key in ("routes", "level", "description", "wazuh", "metadata"):
             if key not in intent:
                 errors.append(f"action {action} needs '{key}'")
-        if "wazuh" in intent and len(intent["wazuh"]["rule_ids"]) != len(routes):
+        if errors:
+            return errors
+        parent, level = str(intent["wazuh"]["parent"]), intent["level"]
+        leaves = {rid for rid in rules if rid != "86601" and not children(rules, rid)}
+        if parent not in leaves:
+            errors.append(f"wazuh.parent {parent} must be a leaf of the ladder {sorted(leaves)} - under a non-leaf "
+                          "parent a ladder sibling can take the event and the tuning rule never fires")
+        landed = ladder_select(rules, intent["metadata"])
+        if landed != parent:
+            errors.append(f"metadata {intent['metadata']} lands on ladder rule {landed}, not on wazuh.parent {parent}")
+        if len(intent["wazuh"]["rule_ids"]) != len(routes):
             errors.append("wazuh.rule_ids needs one ID per route (a union of routes is not one rule)")
-        if action == "lower" and intent.get("level", 0) >= alert_level:
-            errors.append(f"lower needs level < {alert_level} (WAZUH_ALERT_LEVEL)")
-        if action in ("enrich", "raise") and intent.get("level", 0) < alert_level:
+        if action == "lower" and not 1 <= level < alert_level:
+            errors.append(f"lower needs 1 <= level < {alert_level}: level 0 is evaluated before every sibling "
+                          "and would win over any raise")
+        if action in ("enrich", "raise") and level < alert_level:
             errors.append(f"{action} must stay visible: level >= {alert_level}")
-        if action == "lower" and any(not ({"src", "dst"} & set(r)) for r in routes):
-            errors.append("lower needs an address in every route - lowering a SID by port alone is a blind spot")
-        if re.search(r"\b\d{1,3}(\.\d{1,3}){3}\b", intent.get("description", "")):
+        if action == "lower" and any(not {"dst", "dst_port"} <= set(r) for r in routes):
+            errors.append("lower needs dst and dst_port in every route - a host or a port alone hides far more "
+                          "than the verified context")
+        if "rate_limit" in intent:
+            if action != "enrich":
+                errors.append("rate_limit only for enrich: `ignore` is global for the rule and would hide repeats "
+                              "the parent alerts on")
+            if any(len(as_list(r.get(k, []))) > 1 for r in routes for k in ("src", "dst")):
+                errors.append("rate_limit needs one address per route field: all addresses of a route share one "
+                              "ignore window")
+        if re.search(r"\b\d{1,3}(\.\d{1,3}){3}\b", intent["description"]):
             errors.append("description has a literal IP; use $(src_ip)/$(dest_ip)")
     if action == "suppress":
         if not routes:
@@ -116,29 +200,63 @@ def check_semantics(intent, alert_level):
                               "ports or protocol - use action 'lower' in the SIEM for an exact context")
     if action == "disable" and routes:
         errors.append("disable is global; for a context use 'suppress' or 'lower'")
-    if action in ("suppress", "disable") and ("wazuh" in intent or "rate_limit" in intent):
-        errors.append(f"{action} is a Suricata-side action; 'wazuh'/'rate_limit' do not apply")
+    if action in ("suppress", "disable") and ({"wazuh", "rate_limit", "level", "metadata"} & set(intent)):
+        errors.append(f"{action} is a Suricata-side action; wazuh/rate_limit/level/metadata do not apply")
+    if action in ("suppress", "disable") and intent["compensating_control"].strip().lower() in ("", "none", "n/a"):
+        errors.append(f"{action} removes the event even from archives - name the compensating control")
     return errors
 
 
-def load_intents(directory=INTENTS, alert_level=None):
-    alert_level = alert_level if alert_level is not None else int(kitconfig.load()["WAZUH_ALERT_LEVEL"])
-    schema = json.loads(SCHEMA.read_text())
-    intents, errors, seen = [], [], {}
+def check_ids(intents, id_range, rules):
+    """Rule IDs: inside the range, not ladder or reserved, unique, and listed in the registry."""
+    errors, seen = [], {}
+    registry = REGISTRY.read_text() if REGISTRY.exists() else ""
+    lo, hi = id_range
+    for intent in intents:
+        for rid in intent.get("wazuh", {}).get("rule_ids", []):
+            where = f"{intent['id']}: rule id {rid}"
+            if not lo <= rid <= hi:
+                errors.append(f"{where} outside RULE_ID_RANGE {lo}-{hi}")
+            if str(rid) in rules or rid in RESERVED_IDS:
+                errors.append(f"{where} is a ladder or reserved ID")
+            if rid in seen:
+                errors.append(f"{where} already used by {seen[rid]}")
+            if f"| {rid} |" not in registry:
+                errors.append(f"{where} is not in the registry wazuh/README.md")
+            seen[rid] = intent["id"]
+    return errors
+
+
+def check_overlaps(intents):
+    """Two tuning rules that can match the same event: Wazuh picks by level, not by file order, so the
+    outcome would depend on levels nobody reviewed together. Refuse instead."""
+    errors, rows = [], wazuh_rules(intents)
+    for (i1, r1, id1), (i2, r2, id2) in itertools.combinations(rows, 2):
+        if i1["wazuh"]["parent"] == i2["wazuh"]["parent"] and set(i1["sids"]) & set(i2["sids"]) and \
+                routes_overlap(r1, r2):
+            errors.append(f"rules {id1} ({i1['id']}) and {id2} ({i2['id']}) overlap - merge the decisions or make "
+                          "the routes disjoint")
+    return errors
+
+
+def load_intents(directory=INTENTS, alert_level=None, id_range=None):
+    cfg = kitconfig.load()
+    alert_level = alert_level if alert_level is not None else int(cfg["WAZUH_ALERT_LEVEL"])
+    id_range = id_range or tuple(int(x) for x in cfg["RULE_ID_RANGE"].split("-"))
+    schema, rules = json.loads(SCHEMA.read_text()), ladder()
+    intents, errors = [], []
     for path in sorted(pathlib.Path(directory).glob("*.yaml")):
         intent = yaml.safe_load(path.read_text())
         problems = validate(intent, schema)
         if not problems:
-            problems = check_semantics(intent, alert_level)
+            problems = check_semantics(intent, alert_level, rules)
             if intent["id"] != path.stem:
                 problems.append(f"id '{intent['id']}' must equal the file name")
-            for rid in intent.get("wazuh", {}).get("rule_ids", []):
-                if rid in seen:
-                    problems.append(f"rule id {rid} already used by {seen[rid]}")
-                seen[rid] = intent["id"]
         errors += [f"{path.name}: {p}" for p in problems]
-        if intent.get("status", "approved") == "approved":
+        if not problems and intent["status"] == "approved":
             intents.append(intent)
+    if not errors:
+        errors = check_ids(intents, id_range, rules) + check_overlaps(intents)
     if errors:
         raise IntentError("\n".join(errors))
     return intents
@@ -152,28 +270,40 @@ def regex(values, field):
 
 
 def wazuh_rules(intents):
-    """[(intent, route, rule_id)] in file order - the order Wazuh evaluates siblings in."""
+    """[(intent, route, rule_id)] in file order."""
     return [(i, r, rid) for i in intents if i["action"] in SIEM_ACTIONS
             for r, rid in zip(i["routes"], i["wazuh"]["rule_ids"])]
 
 
+def comment(text):
+    """Text inside <!-- -->: escaped, no `--` (which would end or invalidate the comment)."""
+    return re.sub(r"-{2,}", "-", escape(" ".join(str(text).split())))
+
+
 def render_wazuh4(intents):
     out = [f"<!-- {HEADER} -->", '<group name="suricata,tuning,">']
-    for intent, route, rid in wazuh_rules(intents):
+    rows = wazuh_rules(intents)
+    for intent, route, rid in rows:
         ignore = f' ignore="{intent["rate_limit"]["ignore_seconds"]}"' if "rate_limit" in intent else ""
-        out += ["", "  <!--", f"    {intent['id']} ({intent['action'].upper()}) - card: {intent['card']}"]
+        out += ["", "  <!--", f"    {comment(intent['id'])} ({intent['action'].upper()}) - card: {comment(intent['card'])}"]
         for label, key in (("Why", "rationale"), ("Risk", "risk"), ("Compensating control", "compensating_control")):
-            out.append(f"    {label}: {' '.join(intent[key].split())}")
-        out += ["  -->", f'  <rule id="{rid}" level="{intent["level"]}"{ignore}>',
-                f"    <if_sid>{intent['wazuh']['parent']}</if_sid>",
-                f'    <field name="alert.signature_id" type="pcre2">{regex(intent["sids"], "sid")}</field>']
+            out.append(f"    {label}: {comment(intent[key])}")
+        out += ["  -->", f'  <rule id="{int(rid)}" level="{int(intent["level"])}"{ignore}>',
+                f"    <if_sid>{int(intent['wazuh']['parent'])}</if_sid>",
+                f'    <field name="alert.signature_id" type="pcre2">{escape(regex(intent["sids"], "sid"))}</field>']
         for key, field in ROUTE_FIELDS:
             if key in route:
-                out.append(f'    <field name="{field}" type="pcre2">{regex(route[key], key)}</field>')
-        out += [f"    <description>{intent['description']}</description>",
+                out.append(f'    <field name="{field}" type="pcre2">{escape(regex(route[key], key))}</field>')
+        out += [f"    <description>{escape(' '.join(intent['description'].split()))}</description>",
                 f"    <group>suricata,tuning,{intent['id'].replace('-', '_')},</group>", "  </rule>"]
     out.append("</group>")
-    return "\n".join(out) + "\n"
+    xml = "\n".join(out) + "\n"
+    # Whatever the text fields contain, the file must hold exactly the rules the intents declare.
+    parsed = [(r.get("id"), r.findtext("if_sid")) for r in ET.fromstring(f"<root>{xml}</root>").iter("rule")]
+    declared = [(str(rid), str(i["wazuh"]["parent"])) for i, _, rid in rows]
+    if parsed != declared:
+        raise IntentError(f"rendered rules {parsed} differ from the declared {declared}")
+    return xml
 
 
 # ---------- suricata-threshold ----------
@@ -200,52 +330,35 @@ def render_wazuh5(intents):
         "TODO: map intents to the 5.x rule format once released; the intents themselves need no change.")
 
 
-# ---------- ladder model + test generation ----------
+# ---------- test generation ----------
 
-def ladder():
-    """Rule id -> (level, parent, {field: value}) for the hand-written severity ladder, plus stock 86601."""
-    root = ET.fromstring(f"<root>{LADDER.read_text()}</root>")
-    rules = {"86601": (3, None, {})}
-    for r in root.iter("rule"):
-        fields = {f.get("name"): f.text for f in r.findall("field")}
-        rules[r.get("id")] = (int(r.get("level")), r.findtext("if_sid"), fields)
-    return rules
-
-
-def metadata_for(parent, rules):
-    meta, rid = {}, str(parent)
-    while rid in rules:
-        _, up, fields = rules[rid]
-        for name, value in fields.items():
-            if name.startswith("alert.metadata."):
-                meta.setdefault(name.split(".", 2)[2], [value])
-        rid = up
-    return meta
-
-
-def event(intent, rules, sid, ctx):
+def event(intent, sid, ctx):
     return {"timestamp": "2026-01-05T10:00:00.000000+0100", "flow_id": 1, "in_iface": "eth1", "event_type": "alert",
             "src_ip": ctx["src"], "src_port": ctx["src_port"], "dest_ip": ctx["dst"], "dest_port": ctx["dst_port"],
             "proto": ctx["proto"],
             "alert": {"action": "allowed", "gid": 1, "signature_id": sid, "rev": 1, "signature": intent["signature"],
                       "category": "Generated test", "severity": 2,
-                      "metadata": metadata_for(intent["wazuh"]["parent"], rules)}}
+                      "metadata": {k: [v] for k, v in intent["metadata"].items()}}}
 
 
 def route_matches(route, ctx):
     return all(ctx[k] in as_list(route[k]) for k, _ in ROUTE_FIELDS if k in route)
 
 
-def expected(intents, rules, sid, ctx, parent, fired, alert_level):
-    """Model of Wazuh: the first matching tuning child (file order) under this parent wins, else the parent."""
-    for intent, route, rid in wazuh_rules(intents):
-        if intent["wazuh"]["parent"] == parent and sid in intent["sids"] and route_matches(route, ctx):
-            level = intent["level"]
-            alert = level >= alert_level and not ("rate_limit" in intent and rid in fired)
-            fired.add(rid)
-            return str(rid), level, alert
-    level = rules[str(parent)][0]
-    return str(parent), level, level >= alert_level
+def expected(intents, rules, sid, ctx, metadata, fired, alert_level):
+    """Model of Wazuh: the ladder picks the parent from the metadata; among the tuning children of that parent
+    the engine order decides (engine_key); no match -> the parent itself."""
+    parent = ladder_select(rules, metadata)
+    rows = [(intent, route, rid, n) for n, (intent, route, rid) in enumerate(wazuh_rules(intents))
+            if str(intent["wazuh"]["parent"]) == parent and sid in intent["sids"] and route_matches(route, ctx)]
+    if rows:
+        intent, _, rid, _ = min(rows, key=lambda row: engine_key(row[0]["level"], row[3]))
+        level = intent["level"]
+        alert = level >= alert_level and not ("rate_limit" in intent and rid in fired)
+        fired.add(rid)
+        return str(rid), level, alert
+    level = rules[parent]["level"]
+    return parent, level, level >= alert_level
 
 
 def contexts(route):
@@ -264,20 +377,31 @@ def extend_ip(ip):
 
 def negatives(intent):
     """(note, sid, ctx) cases that must NOT be selected by this intent's rules."""
-    cases, sid = [], intent["sids"][0]
-    routes = intent["routes"]
+    cases, routes = [], intent["routes"]
+    for sid in intent["sids"]:  # look-alike SIDs: an unanchored SID regex would match them
+        for probe in (int(f"{sid}0"), int(f"1{sid}")):
+            if probe not in intent["sids"]:
+                cases.append((f"SID {probe} extends {sid} (anchoring)", probe, next(contexts(routes[0]))))
+    sid = intent["sids"][0]
     for n, route in enumerate(routes, 1):
+        for ctx in contexts(route):
+            tag = f"route {n} {ctx['src'] if 'src' in route else ''}->{ctx['dst'] if 'dst' in route else ''}".strip()
+            for key in ("src", "dst"):
+                if key in route:
+                    for ip in extend_ip(ctx[key]):
+                        cases.append((f"{tag}: {key} {ip} extends {ctx[key]} (anchoring)", sid, dict(ctx, **{key: ip})))
+            rev = dict(ctx, src=ctx["dst"], dst=ctx["src"], src_port=ctx["dst_port"], dst_port=ctx["src_port"])
+            cases.append((f"{tag}: reverse direction", sid, rev))
         base = next(contexts(route))
         for nsid in intent.get("tests", {}).get("neighbour_sids", []):
             cases.append((f"route {n}: neighbour SID {nsid} untouched", nsid, base))
-        for key in ("src", "dst"):
-            if key in route:
-                for ip in extend_ip(base[key]):
-                    cases.append((f"route {n}: {key} {ip} extends {base[key]} (anchoring)", sid, dict(base, **{key: ip})))
-        rev = dict(base, src=base["dst"], dst=base["src"], src_port=base["dst_port"], dst_port=base["src_port"])
-        cases.append((f"route {n}: reverse direction", sid, rev))
         if "dst_port" in route:
-            cases.append((f"route {n}: other port", sid, dict(base, dst_port=base["dst_port"] + 1)))
+            cases.append((f"route {n}: other port", sid, dict(base, dst_port=max(as_list(route["dst_port"])) + 1)))
+        if "src_port" in route:
+            cases.append((f"route {n}: other source port", sid, dict(base, src_port=max(as_list(route["src_port"])) + 1)))
+        if "proto" in route:
+            other = next(p for p in ("TCP", "UDP", "ICMP") if p not in as_list(route["proto"]))
+            cases.append((f"route {n}: other protocol", sid, dict(base, proto=other)))
     for (i, a), (j, b) in itertools.permutations(enumerate(routes, 1), 2):
         for key in set(a) & set(b):
             if as_list(a[key]) != as_list(b[key]):
@@ -290,20 +414,20 @@ def negatives(intent):
 def render_tests(intents, all_intents, alert_level):
     rules, files = ladder(), {}
     for intent in (i for i in intents if i["action"] in SIEM_ACTIONS):
-        parent, fired, lines, expect = intent["wazuh"]["parent"], set(), [], []
-        cases = []
+        fired, lines, expect, cases = set(), [], [], []
         for n, route in enumerate(intent["routes"], 1):
             for ctx in contexts(route):
-                cases.append((f"route {n}: {intent['action']}", intent["sids"][0], ctx))
-                if "rate_limit" in intent:
-                    cases.append((f"route {n}: repeat inside ignore window", intent["sids"][0], ctx))
+                for sid in intent["sids"]:
+                    cases.append((f"route {n}: {intent['action']} SID {sid}", sid, ctx))
+                    if "rate_limit" in intent:
+                        cases.append((f"route {n}: repeat inside ignore window", sid, ctx))
         cases += negatives(intent)
         for x in intent.get("tests", {}).get("extra", []):
             ctx = dict(DEFAULT_EVENT, **{k: x[k] for k, _ in ROUTE_FIELDS if k in x})
             cases.append((x["note"], x.get("sid", intent["sids"][0]), ctx))
         for k, (note, sid, ctx) in enumerate(cases, 1):
-            rid, level, alert = expected(all_intents, rules, sid, ctx, parent, fired, alert_level)
-            lines.append(json.dumps(event(intent, rules, sid, ctx)))
+            rid, level, alert = expected(all_intents, rules, sid, ctx, intent["metadata"], fired, alert_level)
+            lines.append(json.dumps(event(intent, sid, ctx)))
             expect.append(f"{k} {rid} {level} {'yes' if alert else 'no'}  # {note}")
         stem = f"intent-{intent['id']}"
         files[f"{stem}.txt"] = f"# {HEADER}\n" + "\n".join(lines) + "\n"

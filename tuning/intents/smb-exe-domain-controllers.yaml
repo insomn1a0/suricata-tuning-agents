@@ -1,11 +1,15 @@
 # GPO and logon scripts make every client read executables from SYSVOL/NETLOGON every morning.
 id: smb-exe-domain-controllers
 card: examples/cards/2025701.md
+status: approved
 action: enrich
 sids: [2025701]
 signature: ET INFO SMB2 NT Create AndX Request For an Executable File
-routes:
-  - dst: [10.10.0.10, 10.10.0.11]   # dc1, dc2
+metadata: {signature_severity: Minor, confidence: High}
+routes:   # one route per DC: each gets its own ignore window
+  - dst: 10.10.0.10   # dc1
+    dst_port: 445
+  - dst: 10.10.0.11   # dc2
     dst_port: 445
 level: 6
 rate_limit:
@@ -16,11 +20,12 @@ description: >-
 rationale: >-
   The signal is a new or changed file in SYSVOL, not each reader. Visible, with what to verify, at most once an hour.
 risk: >-
-  `ignore` is global for the rule, not per source - a second client inside the hour is archived only.
+  `ignore` is global for the rule, not per source - a second client of the same DC inside the hour is
+  archived only.
 compensating_control: DC audit of SYSVOL/NETLOGON writes (5145/4663).
 wazuh:
   parent: 100206
-  rule_ids: [100221]
+  rule_ids: [100221, 100222]
 tests:
   neighbour_sids: [2025709]
   extra:

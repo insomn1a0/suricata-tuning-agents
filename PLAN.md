@@ -67,6 +67,10 @@ Done when: guard tests pass; plugin installs into a clean Claude Code session an
 ## Stage 3 - Backend-neutral tuning intents
 Status: done - two example intents render to the same rule behaviour (36/36 logtest cases on Wazuh 4.14.9, incl. the
 hand-written smb-tuning oracle); a renderer that drops `$` is caught by generated and hand cases alike.
+The reviewer REJECTED the first version (confirmed on 4.14.9): Wazuh orders siblings by level, not file
+order; rationale text could inject a rule; test events copied the parent's metadata. Fixed: engine-order
+model + overlap refusal, escaping + rule-ID assertion, intent carries the SID's real metadata and the parent
+must be the ladder leaf it lands on; status required; lower needs dst+port and level >= 1.
 - [x] Schema `tuning/schema.json` + one YAML file per decision in `tuning/intents/`, e.g. fields:
       id, sid(s), action (lower|enrich|raise|suppress|disable), match {src, dst, dst_port, proto, direction},
       rate_limit, visible_level, rationale, risk, compensating_control, card, tests {positive[], negative[]}.
@@ -78,7 +82,7 @@ hand-written smb-tuning oracle); a renderer that drops `$` is caught by generate
 - [x] Update skills (wazuh-rule-change -> tuning-change) and the example card to point at the intent.
       Decisions made: PyYAML is the only dependency (`make venv`; sensor-side code stays stdlib); schema is
       validated by a small built-in subset validator (no jsonschema); one rule per route; suppress refuses
-      contexts Suricata cannot pin; lint rejects `^a|b$` (top-level alternation); 110.10.0.0/16 is allowed
+      contexts Suricata cannot pin; lint rejects `^a|b$` (top-level alternation); 110.10/16 is allowed (only in generated intent tests)
       in lab data as the anchoring probe.
 Done when: `make render && make test` regenerates identical XML for the two example intents and all tests pass.
 

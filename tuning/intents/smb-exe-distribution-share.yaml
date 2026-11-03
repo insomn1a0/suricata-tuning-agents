@@ -1,9 +1,11 @@
 # Workstations open installers on the software distribution share all day: true, but nothing to do.
 id: smb-exe-distribution-share
 card: examples/cards/2025701.md
+status: approved
 action: lower
 sids: [2025701]
 signature: ET INFO SMB2 NT Create AndX Request For an Executable File
+metadata: {signature_severity: Minor, confidence: High}
 routes:
   - dst: 10.10.20.15        # files01, software distribution share (inventory: role + owner)
     dst_port: 445

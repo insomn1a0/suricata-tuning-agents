@@ -16,7 +16,8 @@ Analyst-visible level in this kit: 6 (`WAZUH_ALERT_LEVEL`).
 | 100205 | 9 | 100203 | Major / High confidence | severity-ladder |
 | 100206 | 6 | 86601 | Minor / High confidence | severity-ladder |
 | 100220 | 3 | 100206 | 2025701 on software distribution share (LOWER) | intent smb-exe-distribution-share, smb-tuning |
-| 100221 | 6, ignore 3600 | 100206 | 2025701 on domain controllers (ENRICH, rate-limited) | intent smb-exe-domain-controllers, smb-tuning |
+| 100221 | 6, ignore 3600 | 100206 | 2025701 on dc1 (ENRICH, rate-limited) | intent smb-exe-domain-controllers, smb-tuning |
+| 100222 | 6, ignore 3600 | 100206 | 2025701 on dc2 (ENRICH, rate-limited) | intent smb-exe-domain-controllers |
 
 Held: 100207-100219 (ladder extensions). Retired: none. Never reuse a retired ID.
 `tools/sensor_snapshot.py::predicted()` mirrors 100200-100206 - change both together.
