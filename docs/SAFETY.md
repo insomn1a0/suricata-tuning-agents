@@ -21,6 +21,25 @@ The kit is designed so that an agent mistake costs a wrong proposal, not a blind
 - Send internal identifiers to web search or other external services.
 - Claim an evidence level that did not run (see docs/PLAYBOOK.md).
 
+## Enforcement: the PreToolUse guard
+Instructions (CLAUDE.md, skills) are context, not enforcement. `.claude/hooks/guard.py` runs before every
+Bash, file-write and web tool call and decides:
+
+| Decision | What |
+|---|---|
+| block (exit 2) | over ssh/scp: write/delete/restart/install verbs, output redirects, in-place edits, scripts piped into a remote interpreter (except `tools/sensor_snapshot.py`), interactive sessions, copying files onto the sensor; internal identifiers (RFC 1918, inventory names, the sensor) in curl/wget/WebFetch/WebSearch; tokens, passwords and private keys written into files |
+| ask (user prompt) | a remote command that is neither a known read nor a known write; copying files off the sensor; `SENSOR_CHANGE=<card-id>`-prefixed sensor changes; `git commit/push/merge/tag`, `gh pr create/merge`, repo visibility |
+| allow | everything else, incl. read-only `ssh sensor 'sudo -n cat ...'` |
+
+It fails closed twice: the script exits 2 on any internal error, and the hook is registered with
+`"onFailure": "block"` (Claude Code >= 2.1.295), so a missing interpreter or a timeout also blocks.
+Verified in a live session: a `tee` over ssh was blocked with the reason shown to the model, and a hook
+pointing at a missing script blocked the call.
+
+Limits - it is a seatbelt, not a sandbox: it reads the command line Claude runs, not what a script does
+inside; obfuscation it cannot parse is asked about, not allowed. The boundary on the sensor is still the
+read-only account.
+
 ## Guard rails in the repo
 - `config/environment.env`, `inventory/hosts.md`, `snapshots/`, `cards/`, `journal/` are git-ignored.
 - `tools/lint_rules.py` fails on unanchored pcre2, unpinned tuning rules and literal IPs in descriptions.
