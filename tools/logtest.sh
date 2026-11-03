@@ -4,6 +4,7 @@
 # Usage: tools/logtest.sh <events-file>      (line format: see tools/logtest_client.py)
 # Config via tools/kitconfig.py (defaults < config/environment.env < env): WAZUH_VERSION, WAZUH_ALERT_LEVEL, WAZUH_LOCATION
 # LOGTEST_DOCKER_ARGS: extra docker run flags, e.g. "--ulimit nofile=65536:65536" to reproduce CI limits.
+# WAZUH_RULES_DIR: rules/decoders to load instead of ./wazuh (tools/corpus_test.py --extra-intent).
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 root="$(cd "$here/.." && pwd)"
@@ -12,7 +13,7 @@ input="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 
 docker run --rm -i --network none --entrypoint "" ${LOGTEST_DOCKER_ARGS:-} \
   -e ALERT_LEVEL="$WAZUH_ALERT_LEVEL" -e LOCATION="$WAZUH_LOCATION" \
-  -v "$root/wazuh:/input/wazuh:ro" -v "$input:/input/events.txt:ro" \
+  -v "${WAZUH_RULES_DIR:-$root/wazuh}:/input/wazuh:ro" -v "$input:/input/events.txt:ro" \
   -v "$here/logtest_client.py:/input/client.py:ro" \
   "wazuh/wazuh-manager:$WAZUH_VERSION" bash -c '
 set -e

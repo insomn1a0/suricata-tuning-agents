@@ -1,0 +1,5 @@
+expect:
+  - name: periodic HTTP check-in to 203.0.113.50
+    match: {alert.signature_id: 9190001, src_ip: 10.10.100.23}
+    visible: true
+    attack: T1071.001

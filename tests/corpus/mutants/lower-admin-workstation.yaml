@@ -1,0 +1,18 @@
+# A plausible but wrong decision: "the admin's workstation copies tools all day - lower it".
+# Schema-valid, semantically valid, its own generated tests pass. It hides lateral tool transfer from that host.
+id: lower-admin-workstation
+card: examples/cards/2025701.md
+action: lower
+sids: [2025701]
+signature: ET INFO SMB2 NT Create AndX Request For an Executable File
+routes:
+  - src: 10.10.100.77
+    dst_port: 445
+level: 3
+description: SMB executable from admin workstation $(src_ip) to $(dest_ip)
+rationale: Admin workstation pushes tools to clients all day.
+risk: Lateral tool transfer from this host is no longer visible.
+compensating_control: none
+wazuh:
+  parent: 100206
+  rule_ids: [100229]
