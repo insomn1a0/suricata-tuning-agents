@@ -143,7 +143,7 @@ Agents propose; humans decide anything that reduces visibility. Details: [`docs/
 config/ inventory/   templates for your environment (real files are git-ignored)
 docs/                PROCESS, PLAYBOOK (lessons), SAFETY
 templates/           triage card, work journal
-tools/               snapshot, diff, lint, logtest runner, pcap runner
+tools/               snapshot, diff, lint, lab-data guard, config, logtest runner, pcap runner
 wazuh/rules/         severity x confidence ladder + example tuning rules (registry in wazuh/README.md)
 suricata/rules/      local signatures (DCSync)
 tests/               logtest specs, pcap generator + cases, unit tests
@@ -154,10 +154,14 @@ examples/            synthetic data generator, worked triage card
 
 | Suite | What it proves | Runs |
 |---|---|---|
-| `lint` | rule hygiene, ID range, parents exist, anchoring | CI, no Docker |
-| `test-unit` | snapshot aggregation, diff, spec consistency, pcap well-formed | CI, stdlib only |
-| `test-logtest` | which Wazuh rule is *actually selected*, level, alert flag | CI, `wazuh/wazuh-manager:4.14.5` |
-| `test-pcap` | the signature fires / stays silent on real packets | CI, `jasonish/suricata:8.0` |
+| `lint` | rule hygiene, ID range, parents exist, anchoring; tracked files contain lab data only | CI, no Docker |
+| `test-unit` | snapshot aggregation, diff, spec consistency, pcap well-formed, config parsing, lab-data guard | CI (Python 3.10, 3.12), stdlib only |
+| `test-logtest` | which Wazuh rule is *actually selected*, level, alert flag; fails on any analysisd ERROR/WARNING | CI, `wazuh/wazuh-manager:4.14.9` |
+| `test-pcap` | the signature fires / stays silent on real packets, per session | CI, `jasonish/suricata:8.0.8` |
+
+Engine versions have one source, `tools/kitconfig.py` (overridden by `config/environment.env`, then by the
+environment: `make test-logtest WAZUH_VERSION=4.14.8`). The tests were checked by mutation: un-anchoring the
+lowered IP or matching the wrong DCE/RPC opnum makes them fail.
 
 A pass in the lab is labelled `logtest <version>` / `pcap-lab <version>`; it does not prove behaviour on a
 different production version, ruleset or traffic mix.
