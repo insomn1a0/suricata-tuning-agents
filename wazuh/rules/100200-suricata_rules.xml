@@ -1,0 +1,96 @@
+<!--
+  Suricata -> Wazuh: severity x confidence ladder plus example tuning rules.
+  IDs: 100200-100299 (see wazuh/README.md registry). Lab addresses only (10.10.0.0/16).
+  Parent 86601 is the stock Wazuh "Suricata: Alert" rule (event_type alert).
+  Analyst-visible threshold in this kit: level >= 6 (WAZUH_ALERT_LEVEL).
+-->
+<group name="suricata,custom,">
+
+  <!-- Critical -->
+  <rule id="100200" level="10">
+    <if_sid>86601</if_sid>
+    <field name="alert.metadata.signature_severity">Critical</field>
+    <description>Suricata Critical: $(alert.signature)</description>
+    <group>suricata,critical,</group>
+  </rule>
+
+  <rule id="100201" level="11">
+    <if_sid>100200</if_sid>
+    <field name="alert.metadata.confidence">Medium</field>
+    <description>Suricata Critical / Medium confidence: $(alert.signature)</description>
+    <group>suricata,critical,medium_confidence,</group>
+  </rule>
+
+  <rule id="100202" level="13">
+    <if_sid>100200</if_sid>
+    <field name="alert.metadata.confidence">High</field>
+    <description>Suricata Critical / High confidence: $(alert.signature)</description>
+    <group>suricata,critical,high_confidence,</group>
+  </rule>
+
+  <!-- Major -->
+  <rule id="100203" level="7">
+    <if_sid>86601</if_sid>
+    <field name="alert.metadata.signature_severity">Major</field>
+    <description>Suricata Major: $(alert.signature)</description>
+    <group>suricata,major,</group>
+  </rule>
+
+  <rule id="100204" level="8">
+    <if_sid>100203</if_sid>
+    <field name="alert.metadata.confidence">Medium</field>
+    <description>Suricata Major / Medium confidence: $(alert.signature)</description>
+    <group>suricata,major,medium_confidence,</group>
+  </rule>
+
+  <rule id="100205" level="9">
+    <if_sid>100203</if_sid>
+    <field name="alert.metadata.confidence">High</field>
+    <description>Suricata Major / High confidence: $(alert.signature)</description>
+    <group>suricata,major,high_confidence,</group>
+  </rule>
+
+  <!-- Minor: only High confidence reaches analysts -->
+  <rule id="100206" level="6">
+    <if_sid>86601</if_sid>
+    <field name="alert.metadata.signature_severity">Minor</field>
+    <field name="alert.metadata.confidence">High</field>
+    <description>Suricata Minor / High confidence: $(alert.signature)</description>
+    <group>suricata,minor,high_confidence,</group>
+  </rule>
+
+</group>
+
+<group name="suricata,tuning,smb_tuning,">
+
+  <!--
+    Card: examples/cards/2025701.md (decision LOWER).
+    Exact context: SID 2025701 + software distribution server 10.10.20.15 + TCP/445.
+    Everything else for this SID (other servers, admin shares, port 139, reverse direction) stays at 100206.
+    Risk accepted: a malicious exe planted on the share looks identical; compensated by file
+    integrity monitoring on the share. Event is still stored in archives.
+  -->
+  <rule id="100220" level="3">
+    <if_sid>100206</if_sid>
+    <field name="alert.signature_id" type="pcre2">^2025701$</field>
+    <field name="dest_ip" type="pcre2">^10\.10\.20\.15$</field>
+    <field name="dest_port" type="pcre2">^445$</field>
+    <description>SMB executable open on software distribution share $(dest_ip) from $(src_ip)</description>
+    <group>suricata,tuning,smb_tuning,</group>
+  </rule>
+
+  <!--
+    Same SID on domain controllers (GPO / logon scripts): keep visible but at most once per hour.
+    Note: `ignore` is global for the rule, not per source - a second client inside the hour is
+    archived only. Accepted because a changed file in SYSVOL is the signal, not each reader.
+  -->
+  <rule id="100221" level="6" ignore="3600">
+    <if_sid>100206</if_sid>
+    <field name="alert.signature_id" type="pcre2">^2025701$</field>
+    <field name="dest_ip" type="pcre2">^10\.10\.0\.1[01]$</field>
+    <field name="dest_port" type="pcre2">^445$</field>
+    <description>SMB executable access on domain controller $(dest_ip) from $(src_ip): usually GPO/logon scripts, verify if the file is new or changed (repeats suppressed for 1h)</description>
+    <group>suricata,tuning,smb_tuning,</group>
+  </rule>
+
+</group>

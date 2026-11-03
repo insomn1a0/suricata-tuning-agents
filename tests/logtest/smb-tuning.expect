@@ -1,0 +1,11 @@
+1 100220 3 no  # distribution share exe -> lowered
+2 100206 6 yes  # neighbour SID (dll) on same server not lowered
+3 100206 6 yes  # port 139 not lowered
+4 100206 6 yes  # reverse direction not lowered
+5 100206 6 yes  # prefix IP 10.10.20.150 not lowered (anchoring)
+6 100206 6 yes  # workstation admin share stays visible
+7 86601 3 no  # no confidence -> stock parent only
+8 100221 6 yes  # DC exe visible (first in hour)
+9 100221 6 no  # DC repeat within 1h -> archived only
+10 100206 6 yes  # 10.10.0.12 is not a DC -> not matched
+11 100206 6 yes  # DLL on DC not covered by 100221
