@@ -1,7 +1,8 @@
 # Suricata -> Wazuh tuning kit
 PY ?= python3
--include config/environment.env
-export WAZUH_VERSION WAZUH_ALERT_LEVEL WAZUH_LOCATION SURICATA_VERSION RULE_ID_RANGE
+export PY
+# Config (engine versions, alert level, ID range) is read by tools/kitconfig.py, not by make:
+# environment.env is shell syntax. Override per run: make test-logtest WAZUH_VERSION=4.14.8
 
 .PHONY: help demo lint test test-unit test-logtest test-pcap snapshot diff clean
 

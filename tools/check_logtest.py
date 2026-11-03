@@ -40,11 +40,12 @@ def run(topic):
                          capture_output=True, text=True)
     lines = out.stdout.splitlines()
     results = [json.loads(l) for l in lines if l.startswith("{")]
+    version = next((l for l in lines if l.startswith("engine: ")), "engine: unknown")
     engine = [l for l in lines + out.stderr.splitlines()
               if not l.startswith("{") and ("ERROR" in l or "WARNING" in l)]
     if out.returncode != 0 and not results:
         engine.append(f"logtest.sh exited {out.returncode}: {out.stderr.strip()[-500:]}")
-    return results, engine
+    return results, engine, version
 
 
 def main(topics):
@@ -54,7 +55,9 @@ def main(topics):
     total = 0
     for topic in topics:
         cases = parse_expect((TESTS / f"{topic}.expect").read_text())
-        results, engine = run(topic)
+        results, engine, version = run(topic)
+        if topic == topics[0]:
+            print(version)
         failures = compare(cases, results)
         for f in failures:
             print(f"FAIL {topic} {f}")

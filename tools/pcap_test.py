@@ -1,7 +1,7 @@
 """Native Suricata check for local signatures: syntax test (-T), then each PCAP from
 tests/pcap/cases.json is replayed offline (-r) in a disposable container with no network,
 and the resulting alerts are compared with the expectations.
-Usage: pcap_test.py [--image jasonish/suricata:8.0] [--keep]
+Usage: pcap_test.py [--image jasonish/suricata:<SURICATA_VERSION>] [--keep]
 Evidence label for passing results: "pcap-lab (Suricata <version>)" - not proof of production behaviour
 on a different version, ruleset or traffic."""
 import argparse
@@ -13,6 +13,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+
+import kitconfig
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CASES = ROOT / "tests" / "pcap" / "cases.json"
@@ -51,7 +53,7 @@ def evaluate(alerts, case):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--image", default=f"jasonish/suricata:{os.environ.get('SURICATA_VERSION') or '8.0'}")
+    p.add_argument("--image", default=f"jasonish/suricata:{kitconfig.load()['SURICATA_VERSION']}")
     p.add_argument("--keep", action="store_true", help="keep the work directory")
     args = p.parse_args()
     if not shutil.which("docker"):
