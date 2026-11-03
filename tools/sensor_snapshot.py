@@ -7,7 +7,7 @@ or locally against a file (lab / demo):
 
 Only aggregates leave the sensor: counts, distinct counts and top-5 lists. Raw events never do.
 `predicted_rule`/`predicted_level` mirror the severity x confidence ladder in
-wazuh/rules/100200-suricata_rules.xml (100200-100206). Tuning children (100220+) are not
+wazuh/rules/100200-suricata_rules.xml (100200-100206). Tuning children (100220+, generated) are not
 modelled - confirm final rule IDs with a SIEM query.
 """
 import argparse

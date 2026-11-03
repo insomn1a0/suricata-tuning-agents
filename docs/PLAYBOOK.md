@@ -4,6 +4,8 @@
 - Ask "what does the analyst do when this fires?" - not "how often does it fire". Volume is a reason to
   look, never a reason to hide.
 - Lower, don't delete. A lowered event stays in archives and can be hunted; a disabled signature is gone.
+- Suricata `suppress` is not a cheaper `lower`: the event never reaches the SIEM or its archives, and it can
+  only track one address side (no port, no pair). Use it for sensor load, not for analyst noise.
   `DISABLE` is for parser/decoder noise that has no value anywhere.
 - Every hiding decision names what could be missed and the compensating control (FIM on a share,
   EDR on servers, DC audit logs). If there is none, say so in the card.
