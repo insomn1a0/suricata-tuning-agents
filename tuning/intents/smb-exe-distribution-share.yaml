@@ -1,0 +1,26 @@
+# Workstations open installers on the software distribution share all day: true, but nothing to do.
+id: smb-exe-distribution-share
+card: examples/cards/2025701.md
+action: lower
+sids: [2025701]
+signature: ET INFO SMB2 NT Create AndX Request For an Executable File
+routes:
+  - dst: 10.10.20.15        # files01, software distribution share (inventory: role + owner)
+    dst_port: 445
+level: 3
+description: SMB executable open on software distribution share $(dest_ip) from $(src_ip)
+rationale: >-
+  90% of the SID's volume is clients reading installers from files01; the analyst action is "nothing".
+  Other servers, admin shares, port 139 and the reverse direction stay visible.
+risk: A malicious exe planted on the share and run by clients looks identical. The event stays in archives.
+compensating_control: FIM on the Deploy share.
+wazuh:
+  parent: 100206
+  rule_ids: [100220]
+tests:
+  neighbour_sids: [2025709]   # DLL variant of the same family
+  extra:
+    - note: exe copied to a workstation admin share stays visible (T1570)
+      src: 10.10.100.77
+      dst: 10.10.30.40
+      dst_port: 445

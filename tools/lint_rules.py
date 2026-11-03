@@ -2,7 +2,8 @@
 - XML parses; rule IDs unique and inside the registry range (RULE_ID_RANGE, default 100200-100299)
 - every <if_sid> points to a rule in this repo or to an allowed stock parent
 - tuning rules (level < 6 or with ignore/frequency) pin alert.signature_id with an anchored pcre2 regex
-- every pcre2 field regex is anchored (^...$) unless it is explicitly case-insensitive domain matching
+- every pcre2 field regex is anchored (^...$) unless it is explicitly case-insensitive domain matching, and an
+  alternation is grouped: ^a|b$ means (^a)|(b$) and also matches 'a...' and '...b'
 - descriptions contain no literal IPv4 addresses (use $(src_ip)/$(dest_ip))
 Usage: lint_rules.py [files...]   exit 1 on findings"""
 import pathlib
@@ -15,6 +16,27 @@ import kitconfig
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 STOCK_PARENTS = {"86600", "86601"}
 IPV4 = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
+
+
+def top_level_alternation(pat):
+    """True if `|` appears outside any (...) or [...] - the anchors then bind only to the first/last branch."""
+    depth, cls, esc = 0, False, False
+    for ch in pat:
+        if esc:
+            esc = False
+        elif ch == "\\":
+            esc = True
+        elif cls:
+            cls = ch != "]"
+        elif ch == "[":
+            cls = True
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        elif ch == "|" and depth == 0:
+            return True
+    return False
 
 
 def load(path):
@@ -54,6 +76,8 @@ def lint(paths, id_range):
                 pat = f.text or ""
                 if not (pat.startswith("^") or pat.startswith("(?i)^")) or not pat.endswith("$"):
                     findings.append(f"{path}: rule {rid} field {name} pcre2 not anchored: {pat}")
+                elif top_level_alternation(pat):
+                    findings.append(f"{path}: rule {rid} field {name} alternation outside a group: {pat}")
         desc = r.findtext("description") or ""
         if IPV4.search(desc):
             findings.append(f"{path}: rule {rid} description has a literal IP; use $(src_ip)/$(dest_ip)")

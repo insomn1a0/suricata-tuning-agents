@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/insomn1a0/suricata-tuning-agents/tuning/schema.json",
+  "title": "Tuning intent",
+  "description": "One approved tuning decision, independent of the SIEM backend. Adapters in tools/render.py turn it into Wazuh XML or Suricata threshold/disable files, and derive the tests.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "card", "action", "sids", "signature", "rationale", "risk", "compensating_control"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,62}$"},
+    "card": {"type": "string", "description": "Triage card with the evidence for this decision"},
+    "status": {"type": "string", "enum": ["approved", "proposed"], "description": "Only approved intents are rendered"},
+    "action": {
+      "type": "string",
+      "enum": ["lower", "enrich", "raise", "suppress", "disable"],
+      "description": "lower/enrich/raise -> SIEM rule (event kept in archives); suppress -> Suricata drops the alert in a context; disable -> signature off everywhere"
+    },
+    "sids": {"type": "array", "items": {"type": "integer", "minimum": 1}, "minItems": 1},
+    "signature": {"type": "string", "description": "Signature message, used in generated test events"},
+    "routes": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Union of exact contexts. Each route is matched as a whole; lists inside one route are an explicit product.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "src": {"$ref": "#/$defs/ips"},
+          "dst": {"$ref": "#/$defs/ips"},
+          "src_port": {"$ref": "#/$defs/ports"},
+          "dst_port": {"$ref": "#/$defs/ports"},
+          "proto": {"type": "string", "enum": ["TCP", "UDP", "ICMP"]}
+        }
+      }
+    },
+    "level": {"type": "integer", "minimum": 0, "maximum": 15, "description": "Wazuh level of the generated rule"},
+    "rate_limit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ignore_seconds"],
+      "properties": {"ignore_seconds": {"type": "integer", "minimum": 1}}
+    },
+    "description": {"type": "string", "description": "Analyst-facing text; decoded fields like $(dest_ip), no literal IPs"},
+    "rationale": {"type": "string"},
+    "risk": {"type": "string", "description": "What could be missed"},
+    "compensating_control": {"type": "string"},
+    "wazuh": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parent", "rule_ids"],
+      "properties": {
+        "parent": {"type": "integer"},
+        "rule_ids": {"type": "array", "items": {"type": "integer"}, "minItems": 1, "description": "One per route"}
+      }
+    },
+    "tests": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "neighbour_sids": {"type": "array", "items": {"type": "integer"}, "description": "Same family, must stay untouched"},
+        "extra": {
+          "type": "array",
+          "description": "Hand-written cases on top of the generated ones",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["note"],
+            "properties": {
+              "note": {"type": "string"},
+              "sid": {"type": "integer"},
+              "src": {"type": "string"}, "dst": {"type": "string"},
+              "src_port": {"type": "integer"}, "dst_port": {"type": "integer"}
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ip": {"type": "string", "pattern": "^\\d{1,3}(\\.\\d{1,3}){3}$"},
+    "ips": {"oneOf": [{"$ref": "#/$defs/ip"}, {"type": "array", "items": {"$ref": "#/$defs/ip"}, "minItems": 1}]},
+    "port": {"type": "integer", "minimum": 0, "maximum": 65535},
+    "ports": {"oneOf": [{"$ref": "#/$defs/port"}, {"type": "array", "items": {"$ref": "#/$defs/port"}, "minItems": 1}]}
+  }
+}
