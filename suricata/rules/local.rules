@@ -1,0 +1,3 @@
+# Local signatures. SID range 9100000-9199999 (see suricata/README.md).
+# Requires address group DC_SERVERS in suricata.yaml (vars.address-groups), e.g. "[10.10.0.10,10.10.0.11]".
+alert dcerpc !$DC_SERVERS any -> $DC_SERVERS any (msg:"LOCAL Possible DCSync - DRSUAPI DRSGetNCChanges from non-DC"; flow:established,to_server; dcerpc.iface:e3514235-4b06-11d1-ab04-00c04fc2dcd2; dcerpc.opnum:3; classtype:credential-theft; sid:9100001; rev:1; metadata:signature_severity Critical, confidence High, mitre_tactic_id TA0006, mitre_tactic_name Credential_Access, mitre_technique_id T1003.006, mitre_technique_name DCSync;)

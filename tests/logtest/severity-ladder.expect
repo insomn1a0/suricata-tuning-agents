@@ -1,0 +1,8 @@
+1 100202 13 yes  # local DCSync signature -> Critical/High
+2 100201 11 yes  # Critical/Medium
+3 100200 10 yes  # Critical without confidence
+4 100205 9 yes  # Major/High
+5 100204 8 yes  # Major/Medium
+6 100203 7 yes  # Major/Low -> parent
+7 86601 3 no  # Minor/Medium hidden
+8 86601 3 no  # Informational hidden

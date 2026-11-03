@@ -1,0 +1,12 @@
+{
+  "suricata_vars": {"HOME_NET": "[10.10.0.0/16]", "EXTERNAL_NET": "!$HOME_NET", "DC_SERVERS": "[10.10.0.10,10.10.0.11]"},
+  "cases": [
+    {
+      "pcap": "dcsync.pcap",
+      "generator": "make_dcerpc_pcap.py",
+      "only_sids": [9100001],
+      "expect": [{"sid": 9100001, "src_ip": "10.10.100.21", "dest_ip": "10.10.0.10", "count": 1}],
+      "notes": "session 1 alerts; opnum 12 and DC->DC replication must not"
+    }
+  ]
+}

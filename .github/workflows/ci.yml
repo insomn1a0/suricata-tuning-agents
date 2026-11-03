@@ -1,0 +1,34 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: make lint test-unit demo
+
+  wazuh-logtest:
+    runs-on: ubuntu-latest
+    needs: static
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker pull wazuh/wazuh-manager:4.14.5
+      - run: make test-logtest WAZUH_VERSION=4.14.5
+
+  suricata-pcap:
+    runs-on: ubuntu-latest
+    needs: static
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker pull jasonish/suricata:8.0
+      - run: make test-pcap SURICATA_VERSION=8.0
