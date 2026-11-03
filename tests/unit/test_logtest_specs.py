@@ -48,6 +48,11 @@ class LintTest(unittest.TestCase):
         self.assertIn("anchored", text)
         self.assertIn("literal IP", text)
 
+    def test_alternation_must_be_grouped(self):
+        self.assertTrue(lint.top_level_alternation(r"^10\.10\.0\.10|10\.10\.0\.11$"))  # also matches 10.10.0.100
+        for ok in (r"^(?:10\.10\.0\.10|10\.10\.0\.11)$", r"^a[|]b$", r"^a\|b$", r"^2025701$"):
+            self.assertFalse(lint.top_level_alternation(ok), ok)
+
 
 if __name__ == "__main__":
     unittest.main()

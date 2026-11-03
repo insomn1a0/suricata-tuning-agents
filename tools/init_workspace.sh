@@ -10,7 +10,7 @@ mkdir -p "$dst"
 dst="$(cd "$dst" && pwd)"
 [[ "$src" == "$dst" ]] && { echo "target is the kit itself - nothing to do"; exit 0; }
 
-items=(CLAUDE.md AGENTS.md Makefile .gitignore docs tools templates wazuh suricata tests examples
+items=(CLAUDE.md AGENTS.md Makefile .gitignore requirements.txt docs tools templates tuning wazuh suricata tests examples
        config/environment.example.env inventory/hosts.example.md)
 copied=0 kept=0
 while IFS= read -r -d '' f; do

@@ -13,3 +13,9 @@ examples/lab/data/
 __pycache__/
 *.pyc
 .DS_Store
+
+# Local virtualenv (make venv)
+/.venv/
+
+# Claude Code agent worktrees
+/.claude/worktrees/
