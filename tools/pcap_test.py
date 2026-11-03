@@ -38,12 +38,14 @@ def evaluate(alerts, case):
     for a in alerts:
         sid = a["alert"]["signature_id"]
         if not wanted or sid in wanted:
-            got[(sid, a.get("src_ip"), a.get("dest_ip"))] += 1
-    exp = collections.Counter({(e["sid"], e["src_ip"], e["dest_ip"]): e["count"] for e in case["expect"]})
+            got[(sid, a.get("src_ip"), a.get("src_port"), a.get("dest_ip"))] += 1
+    # src_port identifies the session: positive and negative sessions may share the same IP pair
+    exp = collections.Counter({(e["sid"], e["src_ip"], e["src_port"], e["dest_ip"]): e["count"]
+                               for e in case["expect"]})
     problems = []
     for key in sorted(set(got) | set(exp), key=str):
         if got[key] != exp[key]:
-            problems.append(f"sid={key[0]} {key[1]}->{key[2]}: expected {exp[key]} got {got[key]}")
+            problems.append(f"sid={key[0]} {key[1]}:{key[2]}->{key[3]}: expected {exp[key]} got {got[key]}")
     return problems
 
 
