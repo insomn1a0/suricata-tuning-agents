@@ -1,9 +1,10 @@
 # Local, environment-specific - never commit (addresses, hostnames, decisions about real hosts)
-config/environment.env
-inventory/hosts.md
-snapshots/
-cards/
-journal/
+# Anchored to the root: examples/cards/ is public lab data and must stay tracked.
+/config/environment.env
+/inventory/hosts.md
+/snapshots/
+/cards/
+/journal/
 
 # Generated demo data
 examples/lab/data/

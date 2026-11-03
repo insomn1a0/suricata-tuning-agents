@@ -25,6 +25,7 @@ demo:
 lint:
 	$(PY) tools/lint_rules.py
 	$(PY) tools/check_lab_data.py
+	$(PY) tools/check_links.py
 
 test-unit:
 	$(PY) -m unittest discover -s tests/unit -t .
