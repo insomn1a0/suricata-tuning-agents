@@ -19,5 +19,6 @@ Analyst-visible level in this kit: 6 (`WAZUH_ALERT_LEVEL`).
 | 100221 | 6, ignore 3600 | 100206 | 2025701 on dc1 (ENRICH, rate-limited) | intent smb-exe-domain-controllers, smb-tuning |
 | 100222 | 6, ignore 3600 | 100206 | 2025701 on dc2 (ENRICH, rate-limited) | intent smb-exe-domain-controllers |
 
-Held: 100207-100219 (ladder extensions). Retired: none. Never reuse a retired ID.
+Held: 100207-100219 (ladder extensions).
+Retired: none. Never reuse a retired ID.
 `tools/sensor_snapshot.py::predicted()` mirrors 100200-100206 - change both together.

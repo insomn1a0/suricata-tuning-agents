@@ -39,7 +39,6 @@ ROUTE_FIELDS = (("src", "src_ip"), ("dst", "dest_ip"), ("src_port", "src_port"),
                 ("proto", "proto"))
 DEFAULT_EVENT = {"src": "10.10.100.21", "dst": "10.10.0.99", "src_port": 50000, "dst_port": 445, "proto": "TCP"}
 SIEM_ACTIONS = {"lower", "enrich", "raise"}
-RESERVED_IDS = range(100207, 100220)  # ladder extensions, see wazuh/README.md
 MAX_ADDRESSES = 8  # per field and route; a wider context is a different decision, not a longer list
 
 
@@ -189,6 +188,8 @@ def check_semantics(intent, alert_level, rules=None):
             if any(len(as_list(r.get(k, []))) > 1 for r in routes for k in ("src", "dst")):
                 errors.append("rate_limit needs one address per route field: all addresses of a route share one "
                               "ignore window")
+        if re.search(r"[&<>]", intent["description"]):
+            errors.append("description must not contain & < > - Wazuh would show the escaped entities literally")
         if re.search(r"\b\d{1,3}(\.\d{1,3}){3}\b", intent["description"]):
             errors.append("description has a literal IP; use $(src_ip)/$(dest_ip)")
     if action == "suppress":
@@ -202,26 +203,44 @@ def check_semantics(intent, alert_level, rules=None):
         errors.append("disable is global; for a context use 'suppress' or 'lower'")
     if action in ("suppress", "disable") and ({"wazuh", "rate_limit", "level", "metadata"} & set(intent)):
         errors.append(f"{action} is a Suricata-side action; wazuh/rate_limit/level/metadata do not apply")
-    if action in ("suppress", "disable") and intent["compensating_control"].strip().lower() in ("", "none", "n/a"):
+    control = re.sub(r"[\W_]+", " ", intent["compensating_control"]).strip().lower()
+    if action in ("suppress", "disable") and (control in ("", "none", "n a", "na", "nothing", "tbd") or len(control) < 4):
         errors.append(f"{action} removes the event even from archives - name the compensating control")
     return errors
 
 
+def registry():
+    """wazuh/README.md -> (ids in the registry table, held ids, retired ids)."""
+    text = REGISTRY.read_text() if REGISTRY.exists() else ""
+    section = text.split("## Registry", 1)[-1].split("\n## ", 1)[0]
+    table = {int(m) for m in re.findall(r"^\| (\d+) \|", section, re.M)}
+
+    def ids(label):
+        line = next((l for l in section.splitlines() if l.startswith(label)), "")
+        out = set()
+        for a, b in re.findall(r"(\d{5,})(?:-(\d{5,}))?", line):
+            out |= set(range(int(a), int(b or a) + 1))
+        return out
+    return table, ids("Held:"), ids("Retired:")
+
+
 def check_ids(intents, id_range, rules):
-    """Rule IDs: inside the range, not ladder or reserved, unique, and listed in the registry."""
+    """Rule IDs: inside the range, not ladder, held or retired, unique, and a row in the registry table."""
     errors, seen = [], {}
-    registry = REGISTRY.read_text() if REGISTRY.exists() else ""
+    table, held, retired = registry()
     lo, hi = id_range
     for intent in intents:
         for rid in intent.get("wazuh", {}).get("rule_ids", []):
             where = f"{intent['id']}: rule id {rid}"
             if not lo <= rid <= hi:
                 errors.append(f"{where} outside RULE_ID_RANGE {lo}-{hi}")
-            if str(rid) in rules or rid in RESERVED_IDS:
+            if str(rid) in rules or rid in held:
                 errors.append(f"{where} is a ladder or reserved ID")
+            if rid in retired:
+                errors.append(f"{where} is retired - never reuse a retired ID")
             if rid in seen:
                 errors.append(f"{where} already used by {seen[rid]}")
-            if f"| {rid} |" not in registry:
+            if rid not in table:
                 errors.append(f"{where} is not in the registry wazuh/README.md")
             seen[rid] = intent["id"]
     return errors
@@ -236,6 +255,18 @@ def check_overlaps(intents):
                 routes_overlap(r1, r2):
             errors.append(f"rules {id1} ({i1['id']}) and {id2} ({i2['id']}) overlap - merge the decisions or make "
                           "the routes disjoint")
+    return errors
+
+
+def check_metadata(intents):
+    """A SID has one metadata: two intents declaring different values cannot both be right (one is dead)."""
+    errors, seen = [], {}
+    for intent in intents:
+        for sid in intent["sids"] if "metadata" in intent else []:
+            if sid in seen and seen[sid][1] != intent["metadata"]:
+                errors.append(f"SID {sid}: metadata {intent['metadata']} in {intent['id']} differs from "
+                              f"{seen[sid][1]} in {seen[sid][0]}")
+            seen.setdefault(sid, (intent["id"], intent["metadata"]))
     return errors
 
 
@@ -256,7 +287,7 @@ def load_intents(directory=INTENTS, alert_level=None, id_range=None):
         if not problems and intent["status"] == "approved":
             intents.append(intent)
     if not errors:
-        errors = check_ids(intents, id_range, rules) + check_overlaps(intents)
+        errors = check_ids(intents, id_range, rules) + check_overlaps(intents) + check_metadata(intents)
     if errors:
         raise IntentError("\n".join(errors))
     return intents
@@ -275,6 +306,14 @@ def wazuh_rules(intents):
             for r, rid in zip(i["routes"], i["wazuh"]["rule_ids"])]
 
 
+def field_regex(values, field):
+    """A field regex that needed XML escaping would be compared escaped and never match - refuse it."""
+    rx = regex(values, field)
+    if escape(rx) != rx:
+        raise IntentError(f"{field}: {rx!r} needs XML escaping and could never match")
+    return rx
+
+
 def comment(text):
     """Text inside <!-- -->: escaped, no `--` (which would end or invalidate the comment)."""
     return re.sub(r"-{2,}", "-", escape(" ".join(str(text).split())))
@@ -290,10 +329,10 @@ def render_wazuh4(intents):
             out.append(f"    {label}: {comment(intent[key])}")
         out += ["  -->", f'  <rule id="{int(rid)}" level="{int(intent["level"])}"{ignore}>',
                 f"    <if_sid>{int(intent['wazuh']['parent'])}</if_sid>",
-                f'    <field name="alert.signature_id" type="pcre2">{escape(regex(intent["sids"], "sid"))}</field>']
+                f'    <field name="alert.signature_id" type="pcre2">{field_regex(intent["sids"], "sid")}</field>']
         for key, field in ROUTE_FIELDS:
             if key in route:
-                out.append(f'    <field name="{field}" type="pcre2">{escape(regex(route[key], key))}</field>')
+                out.append(f'    <field name="{field}" type="pcre2">{field_regex(route[key], key)}</field>')
         out += [f"    <description>{escape(' '.join(intent['description'].split()))}</description>",
                 f"    <group>suricata,tuning,{intent['id'].replace('-', '_')},</group>", "  </rule>"]
     out.append("</group>")
@@ -317,10 +356,12 @@ def render_suricata(intents):
                 for route in intent["routes"]:
                     side, ips = next(iter(route.items()))
                     track = "by_src" if side == "src" else "by_dst"
-                    thr.append(f"suppress gen_id 1, sig_id {sid}, track {track}, ip {','.join(as_list(ips))}"
-                               f"  # {intent['id']}")
+                    # comment on its own line: Suricata rejects the whole line if a comment trails it
+                    thr += [f"# {intent['id']}",
+                            f"suppress gen_id 1, sig_id {sid}, track {track}, ip {','.join(as_list(ips))}"]
         elif intent["action"] == "disable":
-            dis += [f"1:{sid}  # {intent['id']}" for sid in intent["sids"]]
+            for sid in intent["sids"]:
+                dis += [f"# {intent['id']}", f"1:{sid}"]
     return {"threshold.config": "\n".join(thr) + "\n", "disable.conf": "\n".join(dis) + "\n"}
 
 

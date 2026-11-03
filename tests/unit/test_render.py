@@ -22,7 +22,7 @@ BASE = {
     "id": "lab-lower", "card": "examples/cards/2025701.md", "status": "approved", "action": "lower",
     "sids": [2025701], "signature": "ET INFO test", "metadata": {"signature_severity": "Minor", "confidence": "High"},
     "routes": [{"dst": "10.10.20.15", "dst_port": 445}], "level": 3,
-    "description": "test $(dest_ip)", "rationale": "r", "risk": "r", "compensating_control": "c",
+    "description": "test $(dest_ip)", "rationale": "r", "risk": "r", "compensating_control": "FIM on the share",
     "wazuh": {"parent": 100206, "rule_ids": [100250]},
 }
 SURICATA_SIDE = {"wazuh": None, "level": None, "description": None, "metadata": None}
@@ -176,8 +176,27 @@ class Rendering(unittest.TestCase):
     def test_suricata_threshold(self):
         sup = intent(action="suppress", routes=[{"src": ["10.10.0.53", "10.10.0.54"]}], **SURICATA_SIDE)
         out = render.render_suricata([sup, intent(id="lab-off", action="disable", sids=[2200074], **SURICATA_SIDE)])
-        self.assertIn("suppress gen_id 1, sig_id 2025701, track by_src, ip 10.10.0.53,10.10.0.54", out["threshold.config"])
-        self.assertIn("1:2200074", out["disable.conf"])
+        self.assertIn("\nsuppress gen_id 1, sig_id 2025701, track by_src, ip 10.10.0.53,10.10.0.54\n",
+                      out["threshold.config"])
+        self.assertIn("\n1:2200074\n", out["disable.conf"])
+        # Suricata 8 rejects a threshold line with a trailing comment (parse error) and drops the suppression.
+        for text in out.values():
+            for line in text.splitlines():
+                self.assertTrue(line.startswith("#") or "#" not in line, line)
+
+    def test_review_round_2(self):
+        self.assertTrue(problems(description="a & b <c>"))                         # shown escaped by Wazuh
+        sup = dict(action="suppress", routes=[{"dst": "10.10.20.15"}], **SURICATA_SIDE)
+        self.assertTrue(problems(compensating_control="None.", **sup))
+        self.assertTrue(problems(compensating_control="n/a", **sup))
+        a = intent(id="a", metadata={"signature_severity": "Minor", "confidence": "High"})
+        b = intent(id="b", metadata={"signature_severity": "Major", "confidence": "High"})
+        self.assertTrue(render.check_metadata([a, b]))                              # one SID, one metadata
+        self.assertEqual(render.check_metadata([a, intent(id="c")]), [])
+        table, held, retired = render.registry()
+        self.assertIn(100220, table)
+        self.assertIn(100210, held)
+        self.assertNotIn(100220, held | retired)
 
     def test_wazuh5_is_an_explicit_stub(self):
         with self.assertRaises(NotImplementedError):
