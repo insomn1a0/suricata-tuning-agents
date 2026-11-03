@@ -1,7 +1,8 @@
 """Regression corpus runner: tests/corpus/<case>/{input.pcap, test.yaml, siem.yaml}.
 
 Engine stage (`--engine`, evidence label pcap-lab): Suricata replays each pcap offline in a disposable
-container with no network; test.yaml `checks` (suricata-verify syntax: filter / count / match on dotted
+container with no network, with the generated threshold.config (suppress) and disable.conf applied, so
+Suricata-side intents are held to the same standard; test.yaml `checks` (suricata-verify syntax: filter / count / match on dotted
 EVE fields) must hold.
 End-to-end stage (default, adds evidence label logtest): the same alerts go through Wazuh logtest with the
 severity ladder and the rules GENERATED from tuning/intents; siem.yaml says what analysts must and must not
@@ -18,6 +19,7 @@ import argparse
 import collections
 import json
 import os
+import re
 import pathlib
 import shutil
 import subprocess
@@ -55,7 +57,8 @@ def run_suricata(image, case_dir, work, variables):
     rules = work / "all.rules"
     cmd = ["docker", "run", "--rm", "--network", "none", "--entrypoint", "suricata",
            "-v", f"{case_dir}:/case:ro", "-v", f"{work}:/work", image, "--runmode", "single", "-k", "none",
-           "-S", f"/work/{rules.name}", "-r", "/case/input.pcap", "-l", f"/work/{case_dir.name}"]
+           "-S", f"/work/{rules.name}", "-r", "/case/input.pcap", "-l", f"/work/{case_dir.name}",
+           "--set", "threshold-file=/work/threshold.config"]
     for k, v in variables.items():
         cmd += ["--set", f"vars.address-groups.{k}={v}"]
     r = subprocess.run(cmd, capture_output=True, text=True)
@@ -110,14 +113,30 @@ def check_siem(alerts, results, spec):
     return problems, summary
 
 
-def build_rules(extra_intent, work):
-    """Wazuh rules dir: the repo's, or the repo's with an extra intent rendered in."""
+def load_intents(extra_intent, work):
     if not extra_intent:
-        return ROOT / "wazuh"
+        return render.load_intents()
     intents_dir = work / "intents"
     shutil.copytree(render.INTENTS, intents_dir)
     shutil.copy(extra_intent, intents_dir / pathlib.Path(extra_intent).name)
-    intents = render.load_intents(intents_dir)
+    return render.load_intents(intents_dir)
+
+
+def build_suricata(intents, work):
+    """Rules minus disabled SIDs, plus the threshold file - both rendered from the intents."""
+    generated = render.render_suricata(intents)
+    (work / "threshold.config").write_text(generated["threshold.config"])
+    disabled = set(re.findall(r"^1:(\d+)", generated["disable.conf"], re.M))
+    rules = "".join(r.read_text() for r in RULES).splitlines()
+    kept = [line for line in rules if not (re.search(r"\bsid:(\d+);", line) and
+                                           re.search(r"\bsid:(\d+);", line).group(1) in disabled)]
+    (work / "all.rules").write_text("\n".join(kept) + "\n")
+
+
+def build_rules(intents, extra_intent, work):
+    """Wazuh rules dir: the repo's, or the repo's with an extra intent rendered in."""
+    if not extra_intent:
+        return ROOT / "wazuh"
     wazuh = work / "wazuh"
     shutil.copytree(ROOT / "wazuh", wazuh)
     (wazuh / "rules" / render.WAZUH_OUT.name).write_text(render.render_wazuh4(intents))
@@ -139,8 +158,9 @@ def main(argv=None):
     image = f"jasonish/suricata:{cfg['SURICATA_VERSION']}"
     work = pathlib.Path(tempfile.mkdtemp(prefix="corpus-"))
     os.chmod(work, 0o777)
-    (work / "all.rules").write_text("".join(r.read_text() for r in RULES))
-    wazuh_dir = None if args.engine else build_rules(args.extra_intent, work)
+    intents = load_intents(args.extra_intent, work)
+    build_suricata(intents, work)
+    wazuh_dir = None if args.engine else build_rules(intents, args.extra_intent, work)
     cases = sorted(d for d in CORPUS.iterdir() if (d / "test.yaml").exists() and (not args.case or d.name in args.case))
     print(f"engine: {subprocess.run(['docker', 'run', '--rm', '--entrypoint', 'suricata', image, '-V'], capture_output=True, text=True).stdout.strip()} ({image})")
     failed, total, engine = 0, collections.Counter(), "engine: not run"
