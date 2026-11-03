@@ -1,7 +1,7 @@
 """Native Suricata check for local signatures: syntax test (-T), then each PCAP from
 tests/pcap/cases.json is replayed offline (-r) in a disposable container with no network,
 and the resulting alerts are compared with the expectations.
-Usage: pcap_test.py [--image jasonish/suricata:8.0] [--keep]
+Usage: pcap_test.py [--image jasonish/suricata:<SURICATA_VERSION>] [--keep]
 Evidence label for passing results: "pcap-lab (Suricata <version>)" - not proof of production behaviour
 on a different version, ruleset or traffic."""
 import argparse
@@ -13,6 +13,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+
+import kitconfig
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CASES = ROOT / "tests" / "pcap" / "cases.json"
@@ -38,18 +40,20 @@ def evaluate(alerts, case):
     for a in alerts:
         sid = a["alert"]["signature_id"]
         if not wanted or sid in wanted:
-            got[(sid, a.get("src_ip"), a.get("dest_ip"))] += 1
-    exp = collections.Counter({(e["sid"], e["src_ip"], e["dest_ip"]): e["count"] for e in case["expect"]})
+            got[(sid, a.get("src_ip"), a.get("src_port"), a.get("dest_ip"))] += 1
+    # src_port identifies the session: positive and negative sessions may share the same IP pair
+    exp = collections.Counter({(e["sid"], e["src_ip"], e["src_port"], e["dest_ip"]): e["count"]
+                               for e in case["expect"]})
     problems = []
     for key in sorted(set(got) | set(exp), key=str):
         if got[key] != exp[key]:
-            problems.append(f"sid={key[0]} {key[1]}->{key[2]}: expected {exp[key]} got {got[key]}")
+            problems.append(f"sid={key[0]} {key[1]}:{key[2]}->{key[3]}: expected {exp[key]} got {got[key]}")
     return problems
 
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--image", default=f"jasonish/suricata:{os.environ.get('SURICATA_VERSION') or '8.0'}")
+    p.add_argument("--image", default=f"jasonish/suricata:{kitconfig.load()['SURICATA_VERSION']}")
     p.add_argument("--keep", action="store_true", help="keep the work directory")
     args = p.parse_args()
     if not shutil.which("docker"):

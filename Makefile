@@ -1,13 +1,14 @@
 # Suricata -> Wazuh tuning kit
 PY ?= python3
--include config/environment.env
-export WAZUH_VERSION WAZUH_ALERT_LEVEL WAZUH_LOCATION SURICATA_VERSION RULE_ID_RANGE
+export PY
+# Config (engine versions, alert level, ID range) is read by tools/kitconfig.py, not by make:
+# environment.env is shell syntax. Override per run: make test-logtest WAZUH_VERSION=4.14.8
 
 .PHONY: help demo lint test test-unit test-logtest test-pcap snapshot diff clean
 
 help:
 	@echo "make demo          synthetic two-week dataset -> snapshots -> diff (no sensor, no Docker)"
-	@echo "make lint          static checks of wazuh/rules"
+	@echo "make lint          static checks of wazuh/rules + lab-data-only guard"
 	@echo "make test-unit     unit tests (stdlib only)"
 	@echo "make test-logtest  Wazuh logtest in Docker (wazuh/wazuh-manager:\$$WAZUH_VERSION)"
 	@echo "make test-pcap     Suricata pcap tests in Docker (jasonish/suricata:\$$SURICATA_VERSION)"
@@ -23,6 +24,7 @@ demo:
 
 lint:
 	$(PY) tools/lint_rules.py
+	$(PY) tools/check_lab_data.py
 
 test-unit:
 	$(PY) -m unittest discover -s tests/unit -t .

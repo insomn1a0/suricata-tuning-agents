@@ -41,7 +41,7 @@ class LintTest(unittest.TestCase):
         p = pathlib.Path(tempfile.mkdtemp()) / "bad.xml"
         p.write_text('<group name="x,"><rule id="100250" level="3"><if_sid>100206</if_sid>'
                      '<field name="alert.signature_id" type="pcre2">2025701</field>'
-                     '<description>from 10.1.2.3</description></rule></group>')
+                     '<description>from 10.10.2.3</description></rule></group>')
         _, findings = lint.lint([str(p)], (100200, 100299))
         text = "\n".join(findings)
         self.assertIn("not found", text)

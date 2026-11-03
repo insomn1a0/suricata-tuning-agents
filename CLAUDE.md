@@ -2,7 +2,8 @@
 
 Developing the kit itself (open stages in PLAN.md): follow PLAN.md and do NOT run onboarding - there is no real sensor here.
 Using the kit on a real sensor: if `config/environment.env` is missing, run the `onboarding` skill first.
-Every session: read `PLAN.md` (current stage), `journal/WORK.md`, then `docs/PROCESS.md`. Lessons: `docs/PLAYBOOK.md`. Limits: `docs/SAFETY.md`.
+Every session: read `PLAN.md` (current stage), `journal/WORK.md` (git-ignored; absent while developing the kit),
+then `docs/PROCESS.md`. Lessons: `docs/PLAYBOOK.md`. Limits: `docs/SAFETY.md`.
 
 ## Ground rules
 - Goal: alerts a human must act on; everything else prioritised; nothing with security value hidden.
