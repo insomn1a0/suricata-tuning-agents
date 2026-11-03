@@ -14,7 +14,7 @@ concurrency:
 # Engine versions come from tools/kitconfig.py (single source); actions are pinned by commit SHA.
 jobs:
   static:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         python: ["3.10", "3.12"]
@@ -26,14 +26,14 @@ jobs:
       - run: make lint test-unit demo
 
   wazuh-logtest:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: static
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: make test-logtest
 
   suricata-pcap:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: static
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

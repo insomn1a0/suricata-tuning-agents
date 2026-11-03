@@ -3,13 +3,14 @@
 # with no network. One persistent logtest session per file, so `frequency`/`ignore` behave as live.
 # Usage: tools/logtest.sh <events-file>      (line format: see tools/logtest_client.py)
 # Config via tools/kitconfig.py (defaults < config/environment.env < env): WAZUH_VERSION, WAZUH_ALERT_LEVEL, WAZUH_LOCATION
+# LOGTEST_DOCKER_ARGS: extra docker run flags, e.g. "--ulimit nofile=65536:65536" to reproduce CI limits.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 root="$(cd "$here/.." && pwd)"
 eval "$("${PY:-python3}" "$here/kitconfig.py" --shell)"
 input="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 
-docker run --rm -i --network none --entrypoint "" \
+docker run --rm -i --network none --entrypoint "" ${LOGTEST_DOCKER_ARGS:-} \
   -e ALERT_LEVEL="$WAZUH_ALERT_LEVEL" -e LOCATION="$WAZUH_LOCATION" \
   -v "$root/wazuh:/input/wazuh:ro" -v "$input:/input/events.txt:ro" \
   -v "$here/logtest_client.py:/input/client.py:ro" \
@@ -18,6 +19,8 @@ set -e
 cp -a /var/ossec/data_tmp/exclusion/. / 2>/dev/null || true
 # The image entrypoint normally fixes ownership; we bypass it, so analysisd (running as wazuh) could not compile CDB lists.
 chown -R wazuh:wazuh /var/ossec/etc/lists
+# analysisd asks for 458752 fds by default; CI runners cap the container lower (ERROR "Could not set resource limit").
+echo "analysisd.rlimit_nofile=$(ulimit -Hn)" >> /var/ossec/etc/local_internal_options.conf
 sed -i "s|<log_alert_level>[0-9]*</log_alert_level>|<log_alert_level>${ALERT_LEVEL}</log_alert_level>|" /var/ossec/etc/ossec.conf
 cp /input/wazuh/rules/*.xml /var/ossec/etc/rules/
 if ls /input/wazuh/decoders/*.xml >/dev/null 2>&1; then cp /input/wazuh/decoders/*.xml /var/ossec/etc/decoders/; fi
