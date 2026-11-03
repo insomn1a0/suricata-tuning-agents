@@ -29,13 +29,15 @@ Tick tasks off here (`[x]`) as they are done and keep the "Status" line of each 
   no model runs in the alert path.
 
 ## Stage 1 - Green baseline
-Status: not started
-- [ ] `git init`, first commit of the current tree (after the user's yes), create GitHub repo `suricata-tuning-agents`.
-- [ ] Run `make lint test-unit demo`, then `make test-logtest` and `make test-pcap` locally with Docker.
-      These two have NEVER been executed yet - expect fixes (logtest container setup, `--set` of the
-      DC_SERVERS address group, jasonish/suricata entrypoint/permissions, eve.json path).
-- [ ] Bump default `WAZUH_VERSION` to the latest 4.14.x stable (check), keep it configurable.
-- [ ] CI green on GitHub for all three jobs.
+Status: done (PR #1) - all four suites green locally (macOS arm64) and in CI; repo private until made public.
+- [x] `git init`, first commit of the current tree (after the user's yes), create GitHub repo `suricata-tuning-agents`.
+- [x] Run `make lint test-unit demo`, then `make test-logtest` and `make test-pcap` locally with Docker.
+      Fixed: CDB list ownership in the logtest container; analysisd fd limit on CI runners; pcap expectations
+      keyed by IP pair (a wrong-opnum signature passed - found by mutation); make's `-include` of the shell
+      env file kept quotes (-> `tools/kitconfig.py`).
+- [x] Bump default `WAZUH_VERSION` to the latest 4.14.x stable: 4.14.9 (2026-10-15, not 4.14.7); Suricata pinned 8.0.8.
+- [x] CI green on GitHub for all three jobs. Plus: SHA-pinned actions, least-privilege token, dependabot,
+      ubuntu-24.04 runner, lab-data-only guard (`tools/check_lab_data.py`) in `make lint`.
 Done when: all four suites pass locally and in CI; README test-status table matches reality.
 
 ## Stage 2 - Enforced safety (hooks) and plugin packaging
@@ -87,6 +89,18 @@ Status: not started
       or asciinema of `make demo` + one triage card, honest limitations, Wazuh 5 status.
 - [ ] Short write-up `docs/WRITEUP.md` (later a blog post): problem, approach, what the tests caught.
 Done when: a stranger can understand the project from the README in two minutes.
+
+## Ideas found along the way (pick into a stage when it fits)
+- Agent evals: synthetic snapshots with an expected decision per SID (e.g. 2025701 on the distribution share ->
+  LOWER, to a workstation admin share -> KEEP); run the `noise-analyst` and score - tests the LLM behaviour,
+  not just the code. Fits Stage 2 (plugin eval) or Stage 5.
+- Mutation testing as a CI job: apply known-bad mutations (unanchor, drop `!$DC_SERVERS`, wrong opnum,
+  widen a route) and assert the suites fail - turns the manual checks of Stage 1 into a guarantee. Fits Stage 4.
+- Pin engine images by digest (tag + sha256) in kitconfig; dependabot/renovate for the Docker tags.
+- `ruff` + pre-commit (lint, lab-data guard) for contributors.
+- Release tags per stage (`v0.1.0` = green baseline) with a CHANGELOG.
+- Observed: the `wazuh/wazuh-manager:4.14.9` image reports `WAZUH_REVISION="rc2"`; keep the engine-reported
+  version in evidence labels, not the tag.
 
 ## Later (not now)
 - Behavioural analytics over EVE flow/krb5/dns (Kerberoasting, password spraying, DNS tunnelling, lateral fan-out).

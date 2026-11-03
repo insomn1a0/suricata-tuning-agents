@@ -24,4 +24,6 @@ The kit is designed so that an agent mistake costs a wrong proposal, not a blind
 ## Guard rails in the repo
 - `config/environment.env`, `inventory/hosts.md`, `snapshots/`, `cards/`, `journal/` are git-ignored.
 - `tools/lint_rules.py` fails on unanchored pcre2, unpinned tuning rules and literal IPs in descriptions.
+- `tools/check_lab_data.py` (part of `make lint` and CI) fails on any address outside the lab/documentation
+  ranges or internal-looking hostname outside `*.lab.local` in tracked and untracked-not-ignored files.
 - Logtest and pcap tests run in containers with `--network none`.

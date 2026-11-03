@@ -5,11 +5,12 @@
 - every pcre2 field regex is anchored (^...$) unless it is explicitly case-insensitive domain matching
 - descriptions contain no literal IPv4 addresses (use $(src_ip)/$(dest_ip))
 Usage: lint_rules.py [files...]   exit 1 on findings"""
-import os
 import pathlib
 import re
 import sys
 import xml.etree.ElementTree as ET
+
+import kitconfig
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 STOCK_PARENTS = {"86600", "86601"}
@@ -60,7 +61,7 @@ def lint(paths, id_range):
 
 
 def main(argv):
-    spec = os.environ.get("RULE_ID_RANGE") or "100200-100299"
+    spec = kitconfig.load()["RULE_ID_RANGE"]
     id_range = tuple(int(x) for x in spec.split("-"))
     paths = argv or sorted(str(p) for p in (ROOT / "wazuh" / "rules").glob("*.xml"))
     rules, findings = lint(paths, id_range)
