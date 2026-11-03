@@ -277,7 +277,9 @@ def split_commands(command):
     if cur:
         segments.append((cur, piped))
     for groups in subs:
-        segments += split_commands(next(g for g in groups if g))
+        inner = next((g for g in groups if g.strip()), None)  # `` and $() are empty, not commands
+        if inner:
+            segments += split_commands(inner)
     return segments
 
 

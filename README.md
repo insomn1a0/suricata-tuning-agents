@@ -39,7 +39,7 @@ flowchart LR
 
 Procedures are skills (`.claude/skills/`): **`onboarding`** (interviews you and adapts the kit to your
 sensor, Wazuh version, alert level, rule ID range, working hours and autonomy level), `sid-triage`,
-`wazuh-rule-change`, `sensor-change`, `siem-query`. The whole method is plain Markdown, so it is also
+`tuning-change`, `sensor-change`, `siem-query`. The whole method is plain Markdown, so it is also
 readable - and reusable - without any AI.
 
 ## Decision classes
@@ -62,6 +62,28 @@ The card [`examples/cards/2025701.md`](examples/cards/2025701.md) splits it by c
 - distribution share `files01` + :445 → **LOWER** (rule 100220);
 - domain controllers (GPO/logon scripts) → **ENRICH**: visible, says what to verify, max one per hour (100221);
 - an exe copied to *another workstation's* admin share → **KEEP** - that is lateral tool transfer (T1570).
+
+Each decision is a backend-neutral **intent** ([`tuning/intents/`](tuning/intents/), schema in
+[`tuning/schema.json`](tuning/schema.json)):
+
+```yaml
+id: smb-exe-distribution-share
+action: lower
+sids: [2025701]
+routes:
+  - dst: 10.10.20.15        # files01, software distribution share
+    dst_port: 445
+level: 3
+risk: A malicious exe planted on the share and run by clients looks identical. The event stays in archives.
+compensating_control: FIM on the Deploy share.
+wazuh: {parent: 100206, rule_ids: [100220]}
+tests: {neighbour_sids: [2025709]}
+```
+
+`make render` turns intents into Wazuh 4.x XML (`wazuh/rules/100220-suricata_tuning.xml`), Suricata
+`threshold.config`/`disable.conf`, and logtest cases derived from the intent: neighbour SIDs, prefix addresses
+on both sides, reverse direction, other port, crossed route pairs. Wazuh 5 drops XML rules; its adapter is a
+stub until the format is GA - the intents need no change.
 
 ```xml
 <rule id="100220" level="3">
@@ -96,6 +118,7 @@ workstation opnum 3 alerts; `DRSCrackNames` (opnum 12) and DC→DC replication d
 ```bash
 git clone https://github.com/insomn1a0/suricata-tuning-agents && cd suricata-tuning-agents
 make demo         # synthetic two weeks -> snapshots -> diff; no sensor, no Docker
+make venv          # PyYAML for tuning intents (sensor-side tools stay stdlib)
 make lint test-unit
 make test-logtest # Wazuh logtest in a throwaway container (--network none)
 make test-pcap    # Suricata on generated pcaps in a throwaway container
@@ -150,14 +173,15 @@ Agents propose; humans decide anything that reduces visibility. Details: [`docs/
 
 ```
 .claude/agents/      role prompts (5 agents); agents -> .claude/agents for the plugin
-.claude/skills/      procedures: onboarding, sid-triage, wazuh-rule-change, sensor-change, siem-query
+.claude/skills/      procedures: onboarding, sid-triage, tuning-change, sensor-change, siem-query
 .claude/hooks/       guard.py (PreToolUse), hooks.json for the plugin; settings.json registers it for a clone
 .claude-plugin/      plugin and marketplace manifests
 config/ inventory/   templates for your environment (real files are git-ignored)
 docs/                PROCESS, PLAYBOOK (lessons), SAFETY
 templates/           triage card, work journal
 tools/               snapshot, diff, lint, lab-data guard, config, logtest runner, pcap runner
-wazuh/rules/         severity x confidence ladder + example tuning rules (registry in wazuh/README.md)
+tuning/              intents (one YAML per decision) + schema; the source of every tuning rule
+wazuh/rules/         severity x confidence ladder + GENERATED tuning rules (registry in wazuh/README.md)
 suricata/rules/      local signatures (DCSync)
 tests/               logtest specs, pcap generator + cases, unit tests
 examples/            synthetic data generator, worked triage card

@@ -17,7 +17,8 @@
    | `ASK` | needs the owner's knowledge (host role, policy) | a question in the card and the journal |
 
 3. **Decision** - the user approves cards (`proposed` -> `approved`).
-4. **Implementation** - Wazuh rule on a branch (`wazuh-rule-change`) or sensor change (`sensor-change`).
+4. **Implementation** - a tuning intent on a branch (`tuning-change`: `tuning/intents/*.yaml` -> `make render`)
+   or a sensor change (`sensor-change`).
 5. **Verification** - `make lint test-unit test-logtest` (+ `test-pcap` for signatures), then a SIEM
    query (`siem-query`) after deployment.
 6. **Review** - `reviewer` agent once per batch, before the merge request.

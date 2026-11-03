@@ -1,5 +1,6 @@
 <!--
-  Suricata -> Wazuh: severity x confidence ladder plus example tuning rules.
+  Suricata -> Wazuh: severity x confidence ladder (hand-written).
+  Tuning rules are GENERATED from tuning/intents/ into 100220-suricata_tuning.xml - see tools/render.py.
   IDs: 100200-100299 (see wazuh/README.md registry). Lab addresses only (10.10.0.0/16).
   Parent 86601 is the stock Wazuh "Suricata: Alert" rule (event_type alert).
   Analyst-visible threshold in this kit: level >= 6 (WAZUH_ALERT_LEVEL).
@@ -57,40 +58,6 @@
     <field name="alert.metadata.confidence">High</field>
     <description>Suricata Minor / High confidence: $(alert.signature)</description>
     <group>suricata,minor,high_confidence,</group>
-  </rule>
-
-</group>
-
-<group name="suricata,tuning,smb_tuning,">
-
-  <!--
-    Card: examples/cards/2025701.md (decision LOWER).
-    Exact context: SID 2025701 + software distribution server 10.10.20.15 + TCP/445.
-    Everything else for this SID (other servers, admin shares, port 139, reverse direction) stays at 100206.
-    Risk accepted: a malicious exe planted on the share looks identical; compensated by file
-    integrity monitoring on the share. Event is still stored in archives.
-  -->
-  <rule id="100220" level="3">
-    <if_sid>100206</if_sid>
-    <field name="alert.signature_id" type="pcre2">^2025701$</field>
-    <field name="dest_ip" type="pcre2">^10\.10\.20\.15$</field>
-    <field name="dest_port" type="pcre2">^445$</field>
-    <description>SMB executable open on software distribution share $(dest_ip) from $(src_ip)</description>
-    <group>suricata,tuning,smb_tuning,</group>
-  </rule>
-
-  <!--
-    Same SID on domain controllers (GPO / logon scripts): keep visible but at most once per hour.
-    Note: `ignore` is global for the rule, not per source - a second client inside the hour is
-    archived only. Accepted because a changed file in SYSVOL is the signal, not each reader.
-  -->
-  <rule id="100221" level="6" ignore="3600">
-    <if_sid>100206</if_sid>
-    <field name="alert.signature_id" type="pcre2">^2025701$</field>
-    <field name="dest_ip" type="pcre2">^10\.10\.0\.1[01]$</field>
-    <field name="dest_port" type="pcre2">^445$</field>
-    <description>SMB executable access on domain controller $(dest_ip) from $(src_ip): usually GPO/logon scripts, verify if the file is new or changed (repeats suppressed for 1h)</description>
-    <group>suricata,tuning,smb_tuning,</group>
   </rule>
 
 </group>
