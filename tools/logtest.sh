@@ -19,6 +19,8 @@ docker run --rm -i --network none --entrypoint "" \
   "wazuh/wazuh-manager:$WAZUH_VERSION" bash -c '
 set -e
 cp -a /var/ossec/data_tmp/exclusion/. / 2>/dev/null || true
+# The image entrypoint normally fixes ownership; we bypass it, so analysisd (running as wazuh) could not compile CDB lists.
+chown -R wazuh:wazuh /var/ossec/etc/lists
 sed -i "s|<log_alert_level>[0-9]*</log_alert_level>|<log_alert_level>${ALERT_LEVEL}</log_alert_level>|" /var/ossec/etc/ossec.conf
 cp /input/wazuh/rules/*.xml /var/ossec/etc/rules/
 if ls /input/wazuh/decoders/*.xml >/dev/null 2>&1; then cp /input/wazuh/decoders/*.xml /var/ossec/etc/decoders/; fi
