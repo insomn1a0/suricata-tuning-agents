@@ -248,6 +248,7 @@ BASH = [
     ("python3 - <<'EOF'\nimport pathlib\npathlib.Path('.claude/hooks/guard.py').write_text('')\nEOF", "ask"),
     # local work stays unrestricted
     ("rm -rf examples/lab/data && make demo", "allow"),
+    ("printf '```yaml\\nid: x\\n```\\n' > notes.md; echo $()", "allow"),  # empty `` and $() crashed the guard
     ("echo 'unbalanced", "ask"),
 ]
 
@@ -319,6 +320,25 @@ class GuardTable(unittest.TestCase):
 
     def test_case_count(self):
         self.assertGreaterEqual(len(BASH) + len(FILES) + len(WEB), 150)
+
+
+class GuardFuzz(unittest.TestCase):
+    """Every crash is safe (fail closed) but blocks legitimate work: decide() must not raise on odd input."""
+
+    def test_random_shell_fragments(self):
+        import random
+        rng = random.Random(20261103)
+        parts = ["ssh", H, "sudo", "-n", "rm", "cat", "/x", "'", '"', "`", "``", "$(", "$()", ")", "(", "<(", ">(",
+                 "<<", "<<<", "EOF", "\n", "|", "||", "&&", ";", "&", ">", ">>", ">&", "2>&1", "<", "\\", "$", "${",
+                 "}", "{", "=", "-o", "ProxyCommand=x", "--", "bash", "-c", "python3", "-", "curl", "https://x/",
+                 "10.10.20.15", "files01", "kv=1", "tools/sensor_snapshot.py", ".claude/hooks/guard.py", "#", "*"]
+        for _ in range(3000):
+            cmd = " ".join(rng.choice(parts) for _ in range(rng.randint(1, 14)))
+            try:
+                decision, _ = guard.decide("Bash", {"command": cmd}, CTX, str(ROOT), str(ROOT))
+            except Exception as e:  # noqa: BLE001 - any exception is the finding
+                self.fail(f"{type(e).__name__}: {e} on {cmd!r}")
+            self.assertIn(decision, ("allow", "ask", "block"))
 
 
 class GuardContext(unittest.TestCase):
