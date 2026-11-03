@@ -46,4 +46,22 @@ jobs:
     needs: static
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
       - run: make test-pcap
+
+  # Corpus -> Suricata -> EVE -> Wazuh logtest with the generated rules: every attack still visible.
+  # Then each plausible-but-wrong intent in tests/corpus/mutants must make that fail.
+  no-attack-lost:
+    runs-on: ubuntu-24.04
+    needs: [wazuh-logtest, suricata-pcap]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: make test-e2e
+      - run: make test-e2e-mutant

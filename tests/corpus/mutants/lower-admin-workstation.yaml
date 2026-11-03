@@ -1,0 +1,23 @@
+# A plausible but wrong decision: "the admin workstation pushes tools to 10.10.30.40 every day - that host is
+# the IT staging box, lower it". The route is exact (src + dst + port), so it passes the schema, the semantic
+# checks and its own generated tests. But 10.10.30.40 is an ordinary workstation (inventory: unknown host ->
+# ASK), and an exe copied to its admin share is lateral tool transfer (T1570).
+id: lower-admin-workstation
+card: examples/cards/2025701.md
+status: approved
+action: lower
+sids: [2025701]
+signature: ET INFO SMB2 NT Create AndX Request For an Executable File
+metadata: {signature_severity: Minor, confidence: High}
+routes:
+  - src: 10.10.100.77
+    dst: 10.10.30.40
+    dst_port: 445
+level: 3
+description: SMB executable from admin workstation $(src_ip) to staging host $(dest_ip)
+rationale: Admin workstation pushes tools to the staging host all day.
+risk: Lateral tool transfer between these two hosts is no longer visible.
+compensating_control: none
+wazuh:
+  parent: 100206
+  rule_ids: [100229]

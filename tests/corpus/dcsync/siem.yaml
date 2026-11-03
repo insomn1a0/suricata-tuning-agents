@@ -1,0 +1,5 @@
+expect:
+  - name: DCSync from a workstation
+    match: {alert.signature_id: 9100001, src_ip: 10.10.100.21}
+    visible: true
+    attack: T1003.006

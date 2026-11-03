@@ -248,6 +248,8 @@ BASH = [
     ("python3 - <<'EOF'\nimport pathlib\npathlib.Path('.claude/hooks/guard.py').write_text('')\nEOF", "ask"),
     # local work stays unrestricted
     ("rm -rf examples/lab/data && make demo", "allow"),
+    ("for t in a b; do mkdir -p out-$t; docker run --rm img --set 'vars.address-groups.HOME_NET=[10.10.0.0/16]'; done",
+     "allow"),  # local docker with lab addresses is not the sensor
     ("printf '```yaml\\nid: x\\n```\\n' > notes.md; echo $()", "allow"),  # empty `` and $() crashed the guard
     ("echo 'unbalanced", "ask"),
 ]

@@ -1,0 +1,5 @@
+expect:
+  - name: DNS tunnelling-like queries through the internal resolver
+    match: {alert.signature_id: 9190002, src_ip: 10.10.100.24}
+    visible: true
+    attack: T1071.004
