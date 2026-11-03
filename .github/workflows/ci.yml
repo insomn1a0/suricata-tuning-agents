@@ -25,6 +25,14 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: make lint test-unit demo
 
+  secrets:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - run: docker run --rm --network none -v "$PWD:/repo:ro" zricethezav/gitleaks:v8.28.0 git /repo --redact --no-banner
+
   wazuh-logtest:
     runs-on: ubuntu-24.04
     needs: static

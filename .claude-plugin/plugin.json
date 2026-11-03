@@ -1,0 +1,24 @@
+{
+  "name": "suricata-tuning",
+  "version": "0.2.0",
+  "description": "Evidence-first tuning of Suricata -> Wazuh alerts: triage agents, procedures and a PreToolUse guard that keeps the sensor read-only.",
+  "author": {
+    "name": "insomn1a0",
+    "url": "https://github.com/insomn1a0"
+  },
+  "homepage": "https://github.com/insomn1a0/suricata-tuning-agents",
+  "repository": "https://github.com/insomn1a0/suricata-tuning-agents",
+  "license": "MIT",
+  "keywords": [
+    "suricata",
+    "wazuh",
+    "siem",
+    "ids",
+    "alert-tuning",
+    "detection-engineering"
+  ],
+  "skills": [
+    "./.claude/skills"
+  ],
+  "hooks": "./.claude/hooks/hooks.json"
+}
