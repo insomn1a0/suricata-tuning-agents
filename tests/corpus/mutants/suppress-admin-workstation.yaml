@@ -1,0 +1,15 @@
+# A plausible but wrong Suricata-side decision: "the admin workstation trips the SMB exe signature all day -
+# suppress it on the sensor to save SIEM load". Passes every static check (suppress by one address side,
+# a compensating control is named). It drops lateral tool transfer from that host before it reaches the SIEM -
+# not even the archives keep it.
+id: suppress-admin-workstation
+card: examples/cards/2025701.md
+status: approved
+action: suppress
+sids: [2025701]
+signature: ET INFO SMB2 NT Create AndX Request For an Executable File
+routes:
+  - src: 10.10.100.77
+rationale: The admin workstation produces most SMB executable alerts.
+risk: Every SMB executable alert from this host is dropped on the sensor, archives included.
+compensating_control: EDR on the admin workstation

@@ -1,0 +1,5 @@
+# Engine settings shared by all corpus cases (suricata-verify would keep these per test).
+vars:
+  HOME_NET: "[10.10.0.0/16]"
+  EXTERNAL_NET: "!$HOME_NET"
+  DC_SERVERS: "[10.10.0.10,10.10.0.11]"

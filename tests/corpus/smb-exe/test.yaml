@@ -1,0 +1,7 @@
+# Lab stand-in of ET 2025701 fires on every SMB2 CREATE of an .exe - the SIEM decides what analysts see.
+requires:
+  min-version: 8.0.0
+checks:
+  - filter:
+      count: 3
+      match: {event_type: alert, alert.signature_id: 2025701}

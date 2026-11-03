@@ -1,0 +1,10 @@
+# Five long-label TXT queries via the internal resolver alert once (threshold 3 in 60 s); a normal query does not.
+requires:
+  min-version: 8.0.0
+checks:
+  - filter:
+      count: 1
+      match: {event_type: alert, alert.signature_id: 9190002, src_ip: 10.10.100.24}
+  - filter:
+      count: 0
+      match: {event_type: alert, alert.signature_id: 9190002, src_ip: 10.10.100.25}

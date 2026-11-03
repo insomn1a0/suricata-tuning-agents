@@ -1,0 +1,13 @@
+# DRSUAPI GetNCChanges from a workstation alerts; CrackNames (opnum 12) on the same pair and DC->DC replication do not.
+requires:
+  min-version: 8.0.0
+checks:
+  - filter:
+      count: 1
+      match: {event_type: alert, alert.signature_id: 9100001, src_ip: 10.10.100.21, src_port: 50001}
+  - filter:
+      count: 0
+      match: {event_type: alert, alert.signature_id: 9100001, src_port: 50002}
+  - filter:
+      count: 0
+      match: {event_type: alert, alert.signature_id: 9100001, src_ip: 10.10.0.11}

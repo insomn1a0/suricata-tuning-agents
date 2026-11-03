@@ -5,7 +5,7 @@ export PY
 # Config (engine versions, alert level, ID range) is read by tools/kitconfig.py, not by make:
 # environment.env is shell syntax. Override per run: make test-logtest WAZUH_VERSION=4.14.8
 
-.PHONY: help venv render demo lint test test-unit test-logtest test-pcap snapshot diff clean
+.PHONY: help venv render demo lint test test-unit test-logtest test-pcap test-e2e test-e2e-mutant snapshot diff clean
 
 help:
 	@echo "make venv          local virtualenv with requirements.txt (PyYAML for tuning intents)"
@@ -14,7 +14,9 @@ help:
 	@echo "make lint          rule lint, generated files current, lab-data-only guard, doc links"
 	@echo "make test-unit     unit tests (stdlib only)"
 	@echo "make test-logtest  Wazuh logtest in Docker (wazuh/wazuh-manager:\$$WAZUH_VERSION)"
-	@echo "make test-pcap     Suricata pcap tests in Docker (jasonish/suricata:\$$SURICATA_VERSION)"
+	@echo "make test-pcap     corpus pcaps -> Suricata, test.yaml checks (jasonish/suricata:\$$SURICATA_VERSION)"
+	@echo "make test-e2e      corpus -> Suricata -> Wazuh with generated rules: no attack lost"
+	@echo "make test-e2e-mutant  every bad intent in tests/corpus/mutants must make test-e2e fail"
 	@echo "make test          all of the above"
 	@echo "make snapshot      7-day snapshot from the sensor in config/environment.env"
 
@@ -44,9 +46,20 @@ test-logtest:
 	$(PY) tools/check_logtest.py
 
 test-pcap:
-	$(PY) tools/pcap_test.py
+	$(PY) tools/corpus_test.py --engine
 
-test: lint test-unit test-logtest test-pcap
+test-e2e:
+	$(PY) tools/corpus_test.py
+
+# A mutant is a plausible but wrong intent; the corpus must catch it (exit 1). Exit 2 = not run = failure.
+test-e2e-mutant:
+	@for m in tests/corpus/mutants/*.yaml; do \
+	  $(PY) tools/corpus_test.py --extra-intent $$m > /dev/null; rc=$$?; \
+	  if [ $$rc -eq 1 ]; then echo "mutant killed: $$m"; \
+	  elif [ $$rc -eq 0 ]; then echo "MUTANT SURVIVED: $$m - the corpus does not cover this mistake"; exit 1; \
+	  else echo "NOT_RUN: $$m (exit $$rc)"; exit 1; fi; done
+
+test: lint test-unit test-logtest test-pcap test-e2e test-e2e-mutant
 
 snapshot:
 	tools/snapshot.sh 7

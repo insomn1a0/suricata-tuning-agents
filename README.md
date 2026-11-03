@@ -113,6 +113,36 @@ A local signature is handled the same way: [`suricata/rules/local.rules`](surica
 **DCSync** (DRSUAPI `GetNCChanges` from a non-DC, T1003.006) and is proven on a generated pcap:
 workstation opnum 3 alerts; `DRSCrackNames` (opnum 12) and DC→DC replication do not.
 
+## No attack lost
+
+Tests generated from an intent can only check that the rule does what the intent says. They cannot tell that
+the decision itself is wrong. That is what the regression corpus is for ([`tests/corpus/`](tests/corpus/)):
+synthetic attacks - DCSync, an exe copied to another workstation's admin share, a periodic beacon, DNS
+tunnelling - plus the benign traffic around them, generated as pcaps by a stdlib script. `make test-e2e` replays
+them through Suricata, sends the alerts through Wazuh logtest with the **generated** rules and checks
+`siem.yaml`: every attack visible, the noise hidden.
+
+```
+attacks visible 4/4, noise hidden 1/1, context as expected 1/1
+```
+
+`tests/corpus/mutants/` holds plausible but wrong intents - "lower the admin workstation's pushes to the
+'staging host'", "lower everything to the internal resolver", "suppress the admin workstation on the sensor".
+Each passes the schema, the semantic checks and its own generated tests. `make test-e2e-mutant` requires each
+one to make the corpus fail:
+
+```
+FAIL smb-exe: exe copied to another workstation's admin share: expected visible, got rule 100229 level 3 hidden
+mutant killed: tests/corpus/mutants/lower-admin-workstation.yaml
+mutant killed: tests/corpus/mutants/lower-internal-resolver.yaml
+mutant killed: tests/corpus/mutants/suppress-admin-workstation.yaml
+```
+
+The suppress mutant first *survived*: the generated `threshold.config` put a comment at the end of the line,
+Suricata rejected the line with a parse error and silently dropped the suppression. The renderer and the
+runner were fixed (engine errors now fail the run) - a deployment would have carried a suppression that did
+nothing.
+
 ## Quick start
 
 ```bash
@@ -121,7 +151,8 @@ make demo         # synthetic two weeks -> snapshots -> diff; no sensor, no Dock
 make venv          # PyYAML for tuning intents (sensor-side tools stay stdlib)
 make lint test-unit
 make test-logtest # Wazuh logtest in a throwaway container (--network none)
-make test-pcap    # Suricata on generated pcaps in a throwaway container
+make test-pcap    # Suricata on the corpus pcaps in a throwaway container
+make test-e2e test-e2e-mutant   # corpus -> Suricata -> Wazuh: no attack lost; bad intents are caught
 ```
 
 `make demo` shows what the `scout` agent looks at every week:
@@ -183,7 +214,7 @@ tools/               snapshot, diff, lint, lab-data guard, config, logtest runne
 tuning/              intents (one YAML per decision) + schema; the source of every tuning rule
 wazuh/rules/         severity x confidence ladder + GENERATED tuning rules (registry in wazuh/README.md)
 suricata/rules/      local signatures (DCSync)
-tests/               logtest specs, pcap generator + cases, unit tests
+tests/               logtest specs (hand + generated), corpus (pcaps, suricata-verify style checks, mutants), unit
 examples/            synthetic data generator, worked triage card
 ```
 
@@ -192,9 +223,11 @@ examples/            synthetic data generator, worked triage card
 | Suite | What it proves | Runs |
 |---|---|---|
 | `lint` | rule hygiene, ID range, parents exist, anchoring; tracked files contain lab data only | CI, no Docker |
-| `test-unit` | snapshot aggregation, diff, spec consistency, pcap well-formed, config parsing, lab-data guard, PreToolUse guard (68-case table + hook contract) | CI (Python 3.10, 3.12), stdlib only |
+| `test-unit` | snapshot aggregation, diff, intents and renderer, corpus pcaps current and well-formed, config parsing, lab-data guard, PreToolUse guard (~250-case table, fuzzing, hook contract) | CI (Python 3.10, 3.12) |
 | `test-logtest` | which Wazuh rule is *actually selected*, level, alert flag; fails on any analysisd ERROR/WARNING | CI, `wazuh/wazuh-manager:4.14.9` |
-| `test-pcap` | the signature fires / stays silent on real packets, per session | CI, `jasonish/suricata:8.0.8` |
+| `test-pcap` | corpus `test.yaml` checks: signatures fire / stay silent on real packets, per session | CI, `jasonish/suricata:8.0.8` |
+| `test-e2e` | corpus → Suricata → Wazuh with the generated rules: every attack visible, noise hidden | CI, both images |
+| `test-e2e-mutant` | each plausible-but-wrong intent in `tests/corpus/mutants` makes `test-e2e` fail | CI, both images |
 
 Engine versions have one source, `tools/kitconfig.py` (overridden by `config/environment.env`, then by the
 environment: `make test-logtest WAZUH_VERSION=4.14.8`). The tests were checked by mutation: un-anchoring the

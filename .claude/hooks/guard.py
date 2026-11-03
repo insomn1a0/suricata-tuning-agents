@@ -836,7 +836,9 @@ def check_bash(command, ctx, project, cwd):
             verdicts.append(complex_verdict(seg_text, f"`{cmd}` runs commands on a remote host"))
         elif cmd in PLAIN_SENSOR_TOOLS or (keywords and ctx.mentions_sensor(seg_text)):
             executors.append(seg_text)
-        elif (cmd in EXECUTORS or "$" in argv[0]) and (ctx.mentions_sensor(seg_text) or private_ip):
+        elif (cmd in EXECUTORS and ctx.mentions_sensor(seg_text)) or (
+                "$" in argv[0] and (ctx.mentions_sensor(seg_text) or private_ip)) or (
+                cmd in INTERPRETERS and private_ip):  # `${X}sh 10.10.20.5`, python -c "...ip..."
             executors.append(seg_text)
         elif piped and cmd in INTERPRETERS and ctx.mentions_sensor(analysed):
             executors.append(seg_text)  # `... | bash` runs whatever the previous segment printed

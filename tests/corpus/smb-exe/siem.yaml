@@ -1,0 +1,13 @@
+expect:
+  - name: exe copied to another workstation's admin share
+    match: {alert.signature_id: 2025701, src_ip: 10.10.100.77, dest_ip: 10.10.30.40}
+    visible: true
+    attack: T1570
+  - name: installer read from the software distribution share
+    match: {alert.signature_id: 2025701, dest_ip: 10.10.20.15}
+    visible: false
+    rule: 100220
+  - name: logon script exe on a domain controller
+    match: {alert.signature_id: 2025701, dest_ip: 10.10.0.10}
+    visible: true
+    rule: 100221
