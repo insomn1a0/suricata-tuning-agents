@@ -23,6 +23,9 @@ def broken(md_path, text, tracked):
 
 
 def main():
+    if not (ROOT / ".git").exists():
+        print("links: skipped - not a git repository")
+        return 0
     tracked = set(subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True,
                                  check=True).stdout.splitlines())
     findings = [f for p in sorted(tracked) if p.endswith(".md")

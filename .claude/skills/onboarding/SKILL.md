@@ -7,6 +7,10 @@ description: First-run setup - interview the user about their Suricata/Wazuh env
 Goal: the other agents work on *this* environment and *this* user's policy, not on defaults.
 Nothing here writes to the sensor or the SIEM.
 
+0. **Workspace** - if `tools/snapshot.sh` is missing here, the kit was installed as a plugin into an empty
+   directory. Ask the user, then run `"${CLAUDE_PLUGIN_ROOT}/tools/init_workspace.sh" .` (copies tools, rules,
+   tests, templates and CLAUDE.md; never overwrites) and suggest `git init` so tuning work goes on branches.
+
 1. **Interview** (one short question at a time, offer the default from `config/environment.example.env`):
    - Sensor: ssh target for a read-only account, whether sudo is needed to read, EVE log dir and file
      pattern (single `eve.json` or a separate alerts file), Suricata version.

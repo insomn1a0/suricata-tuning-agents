@@ -4,7 +4,7 @@ import io
 import tempfile
 import unittest
 
-from .helpers import load
+from .helpers import ROOT, load
 
 lab = load("tools/check_lab_data.py", "check_lab_data")
 
@@ -34,6 +34,7 @@ class LabDataTest(unittest.TestCase):
             f.flush()
             self.assertEqual(lab.check_file(f.name, "x"), ["x:2: non-lab address 8.8.4.4"])  # lab-data: allow
 
+    @unittest.skipUnless((ROOT / ".git").exists(), "not a git repository")
     def test_repo_is_clean(self):
         with contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(lab.main([]), 0, out.getvalue())

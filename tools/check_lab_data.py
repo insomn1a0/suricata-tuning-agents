@@ -44,6 +44,9 @@ def check_file(path, label):
 
 
 def main(argv):
+    if not argv and not (ROOT / ".git").exists():
+        print("lab-data: skipped - not a git repository (repo hygiene check for the public kit)")
+        return 0
     paths = argv or subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard"], cwd=ROOT, capture_output=True, text=True,
                                    check=True).stdout.splitlines()
     findings = [f for p in paths for f in check_file(p if argv else ROOT / p, p)]
