@@ -100,6 +100,9 @@ class Evaluator(unittest.TestCase):
         problems, summary = runner.check_siem(self.EVENTS[:1], hidden, spec)
         self.assertEqual(len(problems), 1)
         self.assertEqual((summary["attack_ok"], summary["attack_total"]), (0, 1))
+        # an attack suppressed before the SIEM is lost too, not missing from the total
+        problems, summary = runner.check_siem([], [], spec)
+        self.assertEqual((len(problems), summary["attack_ok"], summary["attack_total"]), (1, 0, 1))
 
 
 class Mutants(unittest.TestCase):

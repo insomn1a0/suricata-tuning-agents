@@ -87,7 +87,10 @@ must be the ladder leaf it lands on; status required; lower needs dst+port and l
 Done when: `make render && make test` regenerates identical XML for the two example intents and all tests pass.
 
 ## Stage 4 - Native Suricata tests in suricata-verify format + regression corpus
-Status: done - attacks visible 4/4 on Suricata 8.0.8 + Wazuh 4.14.9; both mutants killed in CI.
+Status: done - attacks visible 4/4 on Suricata 8.0.8 + Wazuh 4.14.9; three mutants killed in CI. The
+suppress mutant first survived and exposed a real bug: Suricata ignores threshold lines with a trailing
+comment (fixed in the renderer; the runner now fails on any engine `E:` line). The generated
+threshold.config and disable.conf are applied in every corpus run, so Suricata-side intents are covered.
 - [x] Convert `tests/pcap/` to suricata-verify layout (`tests/suricata/<name>/test.yaml`, `test.rules`, pcap)
       and run it with the suricata-verify runner in Docker (or a compatible minimal runner if that is impractical -
       document why).

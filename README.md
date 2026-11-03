@@ -126,15 +126,22 @@ them through Suricata, sends the alerts through Wazuh logtest with the **generat
 attacks visible 4/4, noise hidden 1/1, context as expected 1/1
 ```
 
-`tests/corpus/mutants/` holds plausible but wrong intents - "lower the admin workstation that copies tools all
-day", "lower everything to the internal resolver". Each passes the schema, the semantic checks and its own
-generated tests. `make test-e2e-mutant` requires each one to make the corpus fail:
+`tests/corpus/mutants/` holds plausible but wrong intents - "lower the admin workstation's pushes to the
+'staging host'", "lower everything to the internal resolver", "suppress the admin workstation on the sensor".
+Each passes the schema, the semantic checks and its own generated tests. `make test-e2e-mutant` requires each
+one to make the corpus fail:
 
 ```
 FAIL smb-exe: exe copied to another workstation's admin share: expected visible, got rule 100229 level 3 hidden
 mutant killed: tests/corpus/mutants/lower-admin-workstation.yaml
 mutant killed: tests/corpus/mutants/lower-internal-resolver.yaml
+mutant killed: tests/corpus/mutants/suppress-admin-workstation.yaml
 ```
+
+The suppress mutant first *survived*: the generated `threshold.config` put a comment at the end of the line,
+Suricata rejected the line with a parse error and silently dropped the suppression. The renderer and the
+runner were fixed (engine errors now fail the run) - a deployment would have carried a suppression that did
+nothing.
 
 ## Quick start
 

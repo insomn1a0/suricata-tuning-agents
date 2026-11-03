@@ -65,6 +65,10 @@ def run_suricata(image, case_dir, work, variables):
     eve = out / "eve.json"
     if r.returncode != 0 or not eve.exists():
         raise RuntimeError(f"suricata exit {r.returncode}: {r.stderr[-1500:]}")
+    # An engine error is not a pass: a threshold line with a trailing comment was silently ignored this way.
+    errors = [line for line in (r.stdout + r.stderr).splitlines() if re.match(r"^\S*\s*E: ", line) or " E: " in line]
+    if errors:
+        raise RuntimeError("suricata reported errors:\n" + "\n".join(errors[:5]))
     return [json.loads(line) for line in eve.read_text().splitlines() if line.strip()]
 
 
@@ -96,7 +100,9 @@ def check_siem(alerts, results, spec):
     problems, summary = [], collections.Counter()
     for exp in spec.get("expect", []):
         hits = [(a, r) for a, r in zip(alerts, results) if matches(a, exp["match"])]
-        if not hits:
+        kind = "attack" if exp.get("attack") else "noise" if not exp["visible"] else "context"
+        summary[f"{kind}_total"] += 1
+        if not hits:  # never reached the SIEM (suppressed, disabled, not detected): counts as lost
             problems.append(f"{exp['name']}: no alert matched {exp['match']}")
             continue
         for a, r in hits:
@@ -106,10 +112,7 @@ def check_siem(alerts, results, spec):
                                 f"{r.get('id')} level {r.get('level')} {'visible' if visible else 'hidden'}")
             if "rule" in exp and str(r.get("id")) != str(exp["rule"]):
                 problems.append(f"{exp['name']}: expected rule {exp['rule']}, got {r.get('id')}")
-        kind = "attack" if exp.get("attack") else "noise" if not exp["visible"] else "context"
-        ok = all(bool(r.get("alert")) == exp["visible"] for _, r in hits)
-        summary[f"{kind}_total"] += 1
-        summary[f"{kind}_ok"] += ok
+        summary[f"{kind}_ok"] += all(bool(r.get("alert")) == exp["visible"] for _, r in hits)
     return problems, summary
 
 
