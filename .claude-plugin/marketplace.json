@@ -1,0 +1,12 @@
+{
+  "name": "suricata-tuning-agents",
+  "description": "Suricata -> Wazuh alert tuning kit",
+  "owner": { "name": "insomn1a0", "url": "https://github.com/insomn1a0" },
+  "plugins": [
+    {
+      "name": "suricata-tuning",
+      "source": "./",
+      "description": "Triage agents, tuning procedures and a read-only sensor guard"
+    }
+  ]
+}

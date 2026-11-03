@@ -41,18 +41,27 @@ Status: done (PR #1) - all four suites green locally (macOS arm64) and in CI; re
 Done when: all four suites pass locally and in CI; README test-status table matches reality.
 
 ## Stage 2 - Enforced safety (hooks) and plugin packaging
-Status: not started
-- [ ] `.claude/hooks/guard.py` + registration in `.claude/settings.json` (PreToolUse, matcher Bash and file tools):
+Status: done - guard (68-case table, mutation-checked, live-session verified), plugin installs with 5 skills,
+5 agents, 1 hook.
+- [x] `.claude/hooks/guard.py` + registration in `.claude/settings.json` (PreToolUse, matcher Bash and file tools):
       block (exit 2, clear stderr reason) - ssh to the sensor with write/restart/install verbs
       (rm, mv, cp, tee, >, sed -i, systemctl, kill, apt/dnf/pip install, tcpreplay, suricatasc reload) unless
       the command is the approved sensor-change path; `git push` / `git commit` (ask the user instead);
       reading or printing `config/environment.env` secrets is fine but writing tokens/passwords into any file is not;
       any command sending internal identifiers to the web (curl/wget with 10.x, hostnames from inventory).
-- [ ] Fail closed: if the guard crashes, the call is blocked (check docs for the current option).
-- [ ] Unit tests for the guard: table of commands -> allow/block (at least 25 cases, incl. tricky quoting,
+- [x] Fail closed: if the guard crashes, the call is blocked (check docs for the current option).
+      `onFailure: "block"` (>= 2.1.295) + exit 2 on any exception; both verified in a live session.
+      Design change: remote commands use an allowlist (unknown -> ask); the first denylist version let
+      vim, xargs rm, awk system(), tar -x, journalctl --vacuum, ip link set through. The reviewer then
+      REJECTED v2 (dozens of bypasses: loops, `bash -lc`, `sudo -s < script`, `systemctl stop x status`,
+      secrets in JSON); v3 recognises the safe path exactly and asks about the rest - all findings are table rows.
+- [x] Unit tests for the guard: table of commands -> allow/block (at least 25 cases, incl. tricky quoting,
       `ssh host 'sudo -n cat x'` allowed vs `ssh host "sudo tee x"` blocked).
-- [ ] Package agents, skills and hooks as a Claude Code plugin + marketplace manifest in this repo, so users
+- [x] Package agents, skills and hooks as a Claude Code plugin + marketplace manifest in this repo, so users
       install with one command. Document install in README.
+      Agents under `.claude/` are not loaded by plugins (found by `claude plugin details`): `agents` is a
+      symlink to `.claude/agents`. Plugin mode lacks tools/ and CLAUDE.md -> `tools/init_workspace.sh`
+      (onboarding step 0).
 Done when: guard tests pass; plugin installs into a clean Claude Code session and the onboarding skill is visible.
 
 ## Stage 3 - Backend-neutral tuning intents
@@ -96,6 +105,8 @@ Done when: a stranger can understand the project from the README in two minutes.
   not just the code. Fits Stage 2 (plugin eval) or Stage 5.
 - Mutation testing as a CI job: apply known-bad mutations (unanchor, drop `!$DC_SERVERS`, wrong opnum,
   widen a route) and assert the suites fail - turns the manual checks of Stage 1 into a guarantee. Fits Stage 4.
+- Sensor-side boundary: `tools/sensor_ro.py` as an ssh `ForceCommand` that accepts only the guard's
+  read forms (same validator code) + a sudoers template - moves enforcement from the laptop to the sensor.
 - Pin engine images by digest (tag + sha256) in kitconfig; dependabot/renovate for the Docker tags.
 - `ruff` + pre-commit (lint, lab-data guard) for contributors.
 - Release tags per stage (`v0.1.0` = green baseline) with a CHANGELOG.

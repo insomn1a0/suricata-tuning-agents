@@ -118,9 +118,16 @@ SPIKES / DROPS x5 (1):
 Requirements: a read-only ssh account on the sensor (key-based, `BatchMode`), Docker for the engine tests,
 [Claude Code](https://docs.claude.com/en/docs/claude-code/overview).
 
-```bash
-claude            # in the repo; CLAUDE.md starts the onboarding skill on first run
+Either clone the repo and run `claude` in it (CLAUDE.md starts onboarding on first run), or install it as a
+Claude Code plugin in an empty working directory:
+
 ```
+/plugin marketplace add insomn1a0/suricata-tuning-agents
+/plugin install suricata-tuning@suricata-tuning-agents
+```
+
+then ask for onboarding: it copies the kit's working files (tools, rules, tests, CLAUDE.md) into the
+directory first. Use one mode or the other - a clone with the plugin installed loads every skill twice.
 
 Onboarding asks about your environment, writes `config/environment.env` and `inventory/hosts.md`
 (both git-ignored), verifies access and versions read-only, takes the first snapshot and opens the journal.
@@ -129,7 +136,11 @@ Onboarding asks about your environment, writes `config/environment.env` and `inv
 
 Agents propose; humans decide anything that reduces visibility. Details: [`docs/SAFETY.md`](docs/SAFETY.md).
 
-- Sensor access is read-only by default; writes need an explicit yes, a backup and a rollback command.
+- Sensor access is read-only, and that is **enforced**, not just instructed: a PreToolUse hook
+  ([`.claude/hooks/guard.py`](.claude/hooks/guard.py)) blocks writes, restarts, installs and redirects over ssh,
+  asks the user about anything not on a read-only allowlist, routes commit/push/merge to the user, and blocks
+  internal identifiers to the web and secrets written into files. It fails closed. Writes need the
+  `sensor-change` skill, an explicit yes, a backup and a rollback command.
 - Raw telemetry never leaves the sensor: the snapshot ships per-SID aggregates only.
 - Nothing internal is sent to web search or external services.
 - Real snapshots, cards, inventory and journal are git-ignored; `lint_rules.py` rejects literal IPs in
@@ -138,8 +149,10 @@ Agents propose; humans decide anything that reduces visibility. Details: [`docs/
 ## Repository layout
 
 ```
-.claude/agents/      role prompts (5 agents)
+.claude/agents/      role prompts (5 agents); agents -> .claude/agents for the plugin
 .claude/skills/      procedures: onboarding, sid-triage, wazuh-rule-change, sensor-change, siem-query
+.claude/hooks/       guard.py (PreToolUse), hooks.json for the plugin; settings.json registers it for a clone
+.claude-plugin/      plugin and marketplace manifests
 config/ inventory/   templates for your environment (real files are git-ignored)
 docs/                PROCESS, PLAYBOOK (lessons), SAFETY
 templates/           triage card, work journal
@@ -155,7 +168,7 @@ examples/            synthetic data generator, worked triage card
 | Suite | What it proves | Runs |
 |---|---|---|
 | `lint` | rule hygiene, ID range, parents exist, anchoring; tracked files contain lab data only | CI, no Docker |
-| `test-unit` | snapshot aggregation, diff, spec consistency, pcap well-formed, config parsing, lab-data guard | CI (Python 3.10, 3.12), stdlib only |
+| `test-unit` | snapshot aggregation, diff, spec consistency, pcap well-formed, config parsing, lab-data guard, PreToolUse guard (68-case table + hook contract) | CI (Python 3.10, 3.12), stdlib only |
 | `test-logtest` | which Wazuh rule is *actually selected*, level, alert flag; fails on any analysisd ERROR/WARNING | CI, `wazuh/wazuh-manager:4.14.9` |
 | `test-pcap` | the signature fires / stays silent on real packets, per session | CI, `jasonish/suricata:8.0.8` |
 
