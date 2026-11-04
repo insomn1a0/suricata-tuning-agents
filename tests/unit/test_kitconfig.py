@@ -26,6 +26,13 @@ class KitConfigTest(unittest.TestCase):
         self.assertEqual(cfg["RULE_ID_RANGE"], kc.DEFAULTS["RULE_ID_RANGE"])
         self.assertNotIn("UNRELATED", cfg)
 
+    def test_default_images_are_pinned_by_digest(self):
+        refs = kc.images(kc.DEFAULTS)
+        for ref in refs.values():
+            self.assertRegex(ref, r"^[\w./-]+:[\w.-]+@sha256:[0-9a-f]{64}$")
+        other = kc.images(dict(kc.DEFAULTS, WAZUH_VERSION="4.14.8"))
+        self.assertEqual(other["WAZUH_IMAGE"], "wazuh/wazuh-manager:4.14.8")  # not pinned: plain tag, no stale digest
+
     def test_missing_file_gives_defaults(self):
         self.assertEqual(kc.load("/nonexistent/environment.env", environ={}), kc.DEFAULTS)
 

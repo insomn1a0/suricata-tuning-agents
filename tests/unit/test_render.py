@@ -14,7 +14,7 @@ from .helpers import ROOT, load
 try:
     render = load("tools/render.py", "render")
 except ModuleNotFoundError as e:  # PyYAML missing: `make venv`
-    raise unittest.SkipTest(f"render needs {e.name}")
+    raise unittest.SkipTest(f"render needs {e.name}") from e
 
 SCHEMA = json.loads((ROOT / "tuning/schema.json").read_text())
 RULES = render.ladder()
@@ -131,7 +131,8 @@ class EngineModel(unittest.TestCase):
 
     def test_ladder_select(self):
         self.assertEqual(render.ladder_select(RULES, {"signature_severity": "Minor", "confidence": "High"}), "100206")
-        self.assertEqual(render.ladder_select(RULES, {"signature_severity": "Critical", "confidence": "High"}), "100202")
+        critical = {"signature_severity": "Critical", "confidence": "High"}
+        self.assertEqual(render.ladder_select(RULES, critical), "100202")
         self.assertEqual(render.ladder_select(RULES, {"signature_severity": "Minor", "confidence": "Medium"}), "86601")
 
 
@@ -197,6 +198,29 @@ class Rendering(unittest.TestCase):
         self.assertIn(100220, table)
         self.assertIn(100210, held)
         self.assertNotIn(100220, held | retired)
+
+    def test_metadata_is_checked_against_the_rule_text(self):
+        # review round 2: metadata was only declared; a wrong card made a rule that never fires, tests green.
+        with tempfile.TemporaryDirectory() as d:
+            rules = pathlib.Path(d) / "x.rules"
+            rules.write_text('alert tcp any any -> any 445 (msg:"x"; sid:2025701; rev:2; '
+                             'metadata:signature_severity Minor, confidence High, created_at 2020_01_01;)\n'
+                             '# alert tcp any any -> any any (msg:"old"; sid:2025709; '
+                             'metadata:signature_severity Major;)\n')
+            known = render.rule_metadata([rules])
+        self.assertEqual(known[2025701]["confidence"], "High")
+        self.assertNotIn(2025709, known)  # commented-out rules do not count
+        self.assertEqual(render.check_rule_metadata([BASE], known), [])
+        wrong = intent(metadata={"signature_severity": "Major", "confidence": "High"},
+                       wazuh={"parent": 100205, "rule_ids": [100250]})
+        self.assertTrue(render.check_rule_metadata([wrong], known))
+        self.assertEqual(render.check_rule_metadata([intent(sids=[1])], known), [])  # unknown SID: engine check only
+
+    def test_repo_intents_match_their_rules(self):
+        known = render.rule_metadata(render.rule_sources({}))
+        self.assertIn(2025701, known)
+        intents = render.load_intents(render.INTENTS, 6, (100200, 100299))
+        self.assertEqual(render.check_rule_metadata(intents, known), [])
 
     def test_wazuh5_is_an_explicit_stub(self):
         with self.assertRaises(NotImplementedError):

@@ -13,6 +13,8 @@ You collect facts from the Suricata sensor. You never change anything.
 - Prefer existing tools: `tools/snapshot.sh`, `tools/sensor_snapshot.py`.
 - Rule text: `$SENSOR_SUDO grep -h "sid:<SID>;" "$SURICATA_RULES_FILE"`.
 - Bound every query (time range, `head`, byte limits) and say what was truncated.
+- One command or pipeline per ssh call - no `;`, `&&`, `$(...)` or redirects other than `2>/dev/null`/`2>&1`.
+  The sensor may run a ForceCommand (deploy/sensor/) that executes argv without a shell and refuses the rest.
 - Return compact aggregates (counts, top-N pairs, distinct counts, time ranges). At most 3 sample records
   per question, trimmed to the fields that were asked for. No payloads.
 - Report exactly what each command returned; say "not found" / "error" plainly. No interpretation.

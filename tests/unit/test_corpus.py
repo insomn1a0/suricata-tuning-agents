@@ -11,7 +11,7 @@ try:
     import yaml
     runner = load("tools/corpus_test.py", "corpus_test")
 except ModuleNotFoundError as e:  # PyYAML missing: `make venv`
-    raise unittest.SkipTest(f"corpus runner needs {e.name}")
+    raise unittest.SkipTest(f"corpus runner needs {e.name}") from e
 
 gen = load("tests/corpus/generate.py", "corpus_generate")
 lib = load("tests/corpus/pcaplib.py", "pcaplib")
@@ -103,6 +103,17 @@ class Evaluator(unittest.TestCase):
         # an attack suppressed before the SIEM is lost too, not missing from the total
         problems, summary = runner.check_siem([], [], spec)
         self.assertEqual((len(problems), summary["attack_ok"], summary["attack_total"]), (1, 0, 1))
+
+
+class EngineMetadata(unittest.TestCase):
+    def test_declared_metadata_must_match_eve(self):
+        intents = [{"sids": [2025701], "metadata": {"signature_severity": "Minor", "confidence": "High"}}]
+        good = {"alert": {"signature_id": 2025701,
+                          "metadata": {"signature_severity": ["Minor"], "confidence": ["High"]}}}
+        bad = {"alert": {"signature_id": 2025701, "metadata": {"signature_severity": ["Minor"]}}}
+        other = {"alert": {"signature_id": 1, "metadata": {}}}
+        self.assertEqual(runner.metadata_problems([good, other], intents), [])
+        self.assertEqual(len(runner.metadata_problems([bad, bad], intents)), 1)
 
 
 class Mutants(unittest.TestCase):

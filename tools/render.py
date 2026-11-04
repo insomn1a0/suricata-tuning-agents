@@ -204,7 +204,8 @@ def check_semantics(intent, alert_level, rules=None):
     if action in ("suppress", "disable") and ({"wazuh", "rate_limit", "level", "metadata"} & set(intent)):
         errors.append(f"{action} is a Suricata-side action; wazuh/rate_limit/level/metadata do not apply")
     control = re.sub(r"[\W_]+", " ", intent["compensating_control"]).strip().lower()
-    if action in ("suppress", "disable") and (control in ("", "none", "n a", "na", "nothing", "tbd") or len(control) < 4):
+    unnamed = control in ("", "none", "n a", "na", "nothing", "tbd") or len(control) < 4
+    if action in ("suppress", "disable") and unnamed:
         errors.append(f"{action} removes the event even from archives - name the compensating control")
     return errors
 
@@ -216,7 +217,7 @@ def registry():
     table = {int(m) for m in re.findall(r"^\| (\d+) \|", section, re.M)}
 
     def ids(label):
-        line = next((l for l in section.splitlines() if l.startswith(label)), "")
+        line = next((row for row in section.splitlines() if row.startswith(label)), "")
         out = set()
         for a, b in re.findall(r"(\d{5,})(?:-(\d{5,}))?", line):
             out |= set(range(int(a), int(b or a) + 1))
@@ -270,6 +271,42 @@ def check_metadata(intents):
     return errors
 
 
+def rule_metadata(paths):
+    """SID -> {metadata key: value} from Suricata rule files (first value of each key)."""
+    known = {}
+    for path in paths:
+        files = sorted(pathlib.Path(path).glob("*.rules")) if pathlib.Path(path).is_dir() else [pathlib.Path(path)]
+        for f in (f for f in files if f.is_file()):
+            for line in f.read_text(errors="replace").splitlines():
+                sid, meta = re.search(r"\bsid:\s*(\d+)\s*;", line), re.search(r"\bmetadata:\s*([^;]*);", line)
+                if sid and not line.lstrip().startswith("#"):
+                    pairs = (p.strip().split(None, 1) for p in (meta.group(1).split(",") if meta else []))
+                    known[int(sid.group(1))] = {p[0]: p[1].strip() for p in pairs if len(p) == 2}
+    return known
+
+
+def check_rule_metadata(intents, known):
+    """The metadata an intent declares must be what the rule text says - otherwise the ladder sends the alert
+    elsewhere and the tuning rule never fires, while the generated tests (built from the intent) still pass."""
+    errors = []
+    for intent in (i for i in intents if "metadata" in i):
+        for sid in (s for s in intent["sids"] if s in known):
+            actual = {k: known[sid].get(k) for k in intent["metadata"]}
+            if actual != intent["metadata"]:
+                errors.append(f"{intent['id']}: SID {sid} declares {intent['metadata']} "
+                              f"but its rule text says {actual}")
+    return errors
+
+
+def rule_sources(cfg):
+    """Rule files to check intents against: the repo's local rules and corpus stand-ins, plus an optional local
+    cache of the sensor's rule lines (SURICATA_RULES_CACHE, git-ignored - rule text, not telemetry)."""
+    sources = [ROOT / "suricata" / "rules", ROOT / "tests" / "corpus" / "lab-standins.rules"]
+    if cfg.get("SURICATA_RULES_CACHE"):
+        sources.append(pathlib.Path(cfg["SURICATA_RULES_CACHE"]).expanduser())
+    return sources
+
+
 def load_intents(directory=INTENTS, alert_level=None, id_range=None):
     cfg = kitconfig.load()
     alert_level = alert_level if alert_level is not None else int(cfg["WAZUH_ALERT_LEVEL"])
@@ -287,7 +324,8 @@ def load_intents(directory=INTENTS, alert_level=None, id_range=None):
         if not problems and intent["status"] == "approved":
             intents.append(intent)
     if not errors:
-        errors = check_ids(intents, id_range, rules) + check_overlaps(intents) + check_metadata(intents)
+        errors = (check_ids(intents, id_range, rules) + check_overlaps(intents) + check_metadata(intents) +
+                  check_rule_metadata(intents, rule_metadata(rule_sources(cfg))))
     if errors:
         raise IntentError("\n".join(errors))
     return intents
@@ -324,7 +362,8 @@ def render_wazuh4(intents):
     rows = wazuh_rules(intents)
     for intent, route, rid in rows:
         ignore = f' ignore="{intent["rate_limit"]["ignore_seconds"]}"' if "rate_limit" in intent else ""
-        out += ["", "  <!--", f"    {comment(intent['id'])} ({intent['action'].upper()}) - card: {comment(intent['card'])}"]
+        head = f"    {comment(intent['id'])} ({intent['action'].upper()}) - card: {comment(intent['card'])}"
+        out += ["", "  <!--", head]
         for label, key in (("Why", "rationale"), ("Risk", "risk"), ("Compensating control", "compensating_control")):
             out.append(f"    {label}: {comment(intent[key])}")
         out += ["  -->", f'  <rule id="{int(rid)}" level="{int(intent["level"])}"{ignore}>',
@@ -439,7 +478,8 @@ def negatives(intent):
         if "dst_port" in route:
             cases.append((f"route {n}: other port", sid, dict(base, dst_port=max(as_list(route["dst_port"])) + 1)))
         if "src_port" in route:
-            cases.append((f"route {n}: other source port", sid, dict(base, src_port=max(as_list(route["src_port"])) + 1)))
+            other = max(as_list(route["src_port"])) + 1
+            cases.append((f"route {n}: other source port", sid, dict(base, src_port=other)))
         if "proto" in route:
             other = next(p for p in ("TCP", "UDP", "ICMP") if p not in as_list(route["proto"]))
             cases.append((f"route {n}: other protocol", sid, dict(base, proto=other)))

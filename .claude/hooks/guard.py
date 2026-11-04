@@ -177,7 +177,8 @@ class Context:
             hosts = root / "inventory" / "hosts.md"
             if hosts.is_file():
                 for line in hosts.read_text().splitlines():
-                    cells = [c.strip() for c in line.strip().strip("|").split("|")] if line.lstrip().startswith("|") else []
+                    table_row = line.lstrip().startswith("|")
+                    cells = [c.strip() for c in line.strip().strip("|").split("|")] if table_row else []
                     if len(cells) < 2 or set(cells[0]) <= set("-: ") or cells[0].lower() in ("address", "ip"):
                         continue
                     addr, name = cells[0], cells[1]
@@ -440,7 +441,9 @@ def remote_read_check(cmd, args):
         return ASK, "unusual `ip` form"
     if cmd == "ethtool":
         opts = [a for a in args if a.startswith("-")]
-        return None if set(opts) <= ETHTOOL_READ and len(nonopt) <= 1 else (BLOCK, "`ethtool` that changes NIC settings")
+        if set(opts) <= ETHTOOL_READ and len(nonopt) <= 1:
+            return None
+        return BLOCK, "`ethtool` that changes NIC settings"
     if cmd == "dpkg":
         if any(DPKG_WRITE.match(a) for a in args):
             return BLOCK, "`dpkg` that changes packages"
@@ -501,7 +504,8 @@ def bounding_stage(argv):
     if cmd in ("head", "tail"):
         if "-f" in args or "-F" in args or "--follow" in args:
             return False
-        counts = [args[k + 1] for k, a in enumerate(args) if a in ("-n", "-c", "--lines", "--bytes") and k + 1 < len(args)]
+        counts = [args[k + 1] for k, a in enumerate(args)
+                  if a in ("-n", "-c", "--lines", "--bytes") and k + 1 < len(args)]
         counts += [a[2:] for a in args if re.match(r"^-[nc]\d", a)] + [a[1:] for a in args if re.match(r"^-\d+$", a)]
         limit = 1000
         return bool(counts) and all(re.fullmatch(r"\d+", c) and int(c) <= (limit if "-c" not in args else 65536)
@@ -652,7 +656,7 @@ def check_ssh(argv, stdin, approved, ctx, project, cwd):
             break
         if opt.startswith("-o"):
             value = opt[2:] or (args[i + 1] if i + 1 < len(args) else "")
-            key = re.split(r"[=\s]", value, 1)[0].lower()
+            key = re.split(r"[=\s]", value, maxsplit=1)[0].lower()
             if key not in SAFE_SSH_OPTIONS:
                 verdicts.append((ASK, f"ssh option `-o {value}`"))
             i += 1 if opt[2:] else 2
@@ -852,7 +856,8 @@ def check_bash(command, ctx, project, cwd):
                 EGRESS_TEXT.search(" ".join(argv[:1])):
             leaked = ctx.internal_identifiers(seg_text)
             if leaked:
-                verdicts.append((BLOCK, f"internal identifiers {leaked} would leave for the web or an external service"))
+                verdicts.append((BLOCK, f"internal identifiers {leaked} would leave for the web or an external "
+                                        "service"))
         if any(p in t for t in write_targets(cmd, args, argv) for p in PROTECTED) or (
                 cmd in INTERPRETERS and any(p in analysed for p in PROTECTED)):
             verdicts.append((ASK, "this changes the guard, its registration or a script it trusts - confirm"))
@@ -871,6 +876,8 @@ def secrets_in(text):
     found = [(m.group(0)[:12] + "...", what) for rx, what in SECRET_PATTERNS for m in rx.finditer(text)]
     for m in CRED_KEY.finditer(text):
         value = next(g for g in m.groups() if g is not None).strip()
+        if "nopasswd" in m.group(0).lower():  # sudoers keyword, not a password
+            continue
         if len(value) >= 6 and not PLACEHOLDER.match(value) and not re.search(r"[()\[\]]", value):
             found.append((m.group(0)[:12] + "...", "credential assignment"))
     return found
@@ -895,7 +902,9 @@ def check_web(tool_input, ctx):
     keys = ("url", "query", "prompt", "allowed_domains", "blocked_domains")
     text = " ".join(json.dumps(tool_input.get(k, "")) for k in keys)
     leaked = ctx.internal_identifiers(text)
-    return [(BLOCK, f"internal identifiers {leaked} must not be sent to web search or external services")] if leaked else []
+    if not leaked:
+        return []
+    return [(BLOCK, f"internal identifiers {leaked} must not be sent to web search or external services")]
 
 
 REQUIRED = {"Bash": ["command"], "Write": ["file_path", "content"], "Edit": ["file_path", "new_string"],

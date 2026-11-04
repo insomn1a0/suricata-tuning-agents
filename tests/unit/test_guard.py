@@ -275,6 +275,8 @@ FILES = [
     ("Write", {"file_path": "config/environment.example.env", "content": 'SENSOR_SSH="analyst@sensor.lab.local"\n'}, "allow"),
     ("Edit", {"file_path": "tools/logtest_client.py", "old_string": "a", "new_string": kv("token", ' d.get("token", token)', " =")}, "allow"),
     ("Write", {"file_path": "x.py", "content": kv("token", "None", " = ")}, "allow"),
+    ("Write", {"file_path": "deploy/sensor/sudoers.example",
+               "content": "suricata-ro ALL=(root) " + "NOPASS" + "WD:NOEXEC: /usr/bin/suricata -V"}, "allow"),
     # the guard and the scripts it trusts: changes need the user
     ("Edit", {"file_path": str(ROOT / ".claude/hooks/guard.py"), "old_string": "a", "new_string": "b"}, "ask"),
     ("Write", {"file_path": "tools/sensor_snapshot.py", "content": "import os"}, "ask"),

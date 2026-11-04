@@ -15,7 +15,7 @@ docker run --rm -i --network none --entrypoint "" ${LOGTEST_DOCKER_ARGS:-} \
   -e ALERT_LEVEL="$WAZUH_ALERT_LEVEL" -e LOCATION="$WAZUH_LOCATION" \
   -v "${WAZUH_RULES_DIR:-$root/wazuh}:/input/wazuh:ro" -v "$input:/input/events.txt:ro" \
   -v "$here/logtest_client.py:/input/client.py:ro" \
-  "wazuh/wazuh-manager:$WAZUH_VERSION" bash -c '
+  "$WAZUH_IMAGE" bash -c '
 set -e
 cp -a /var/ossec/data_tmp/exclusion/. / 2>/dev/null || true
 # The image entrypoint normally fixes ownership; we bypass it, so analysisd (running as wazuh) could not compile CDB lists.

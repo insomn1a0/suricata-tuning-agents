@@ -22,6 +22,9 @@ Nothing here writes to the sensor or the SIEM.
      `inventory/hosts.example.md`. Unknown is fine - those hosts will produce ASK decisions.
 2. **Write** `config/environment.env` and `inventory/hosts.md` (both git-ignored). No passwords, tokens or keys.
 3. **Verify, read-only**, and report each check as OK / FAIL with the command output:
+   - `ssh -o BatchMode=yes "$SENSOR_SSH" 'id; id'` - `sensor-ro: denied` means the sensor-side boundary
+     (`deploy/sensor/`) is installed (it runs one command per login); two `id` lines mean it is not: tell the
+     user, it is the sensor admin's job.
    - `ssh -o BatchMode=yes "$SENSOR_SSH" true`
    - `ssh ... "$SENSOR_SUDO suricata -V"` - compare with `SURICATA_VERSION`
    - `ssh ... "$SENSOR_SUDO ls -la $SURICATA_LOG_DIR"` - the alert files exist and are fresh

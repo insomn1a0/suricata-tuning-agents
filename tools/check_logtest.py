@@ -39,10 +39,10 @@ def run(topic):
     out = subprocess.run([str(ROOT / "tools" / "logtest.sh"), str(TESTS / f"{topic}.txt")],
                          capture_output=True, text=True)
     lines = out.stdout.splitlines()
-    results = [json.loads(l) for l in lines if l.startswith("{")]
-    version = next((l for l in lines if l.startswith("engine: ")), "engine: unknown")
-    engine = [l for l in lines + out.stderr.splitlines()
-              if not l.startswith("{") and ("ERROR" in l or "WARNING" in l)]
+    results = [json.loads(line) for line in lines if line.startswith("{")]
+    version = next((line for line in lines if line.startswith("engine: ")), "engine: unknown")
+    engine = [line for line in lines + out.stderr.splitlines()
+              if not line.startswith("{") and ("ERROR" in line or "WARNING" in line)]
     if out.returncode != 0 and not results:
         engine.append(f"logtest.sh exited {out.returncode}: {out.stderr.strip()[-500:]}")
     return results, engine, version

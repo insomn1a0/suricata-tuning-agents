@@ -11,12 +11,16 @@ import sys
 TZ = datetime.timezone(datetime.timedelta(hours=1))
 CLIENTS = [f"10.10.100.{i}" for i in range(20, 80)]
 SIGS = {
-    2025701: ("ET INFO SMB2 NT Create AndX Request For an Executable File", "Potentially Bad Traffic", "Minor", "High", "smb"),
+    2025701: ("ET INFO SMB2 NT Create AndX Request For an Executable File", "Potentially Bad Traffic",
+              "Minor", "High", "smb"),
     2025709: ("ET INFO SMB2 NT Create AndX Request For a DLL File", "Potentially Bad Traffic", "Minor", "High", "smb"),
     9900001: ("EXAMPLE DNS Query to Advertising/Tracking Domain", "Misc activity", "Minor", "High", "dns"),
-    9900002: ("EXAMPLE TLS SNI of Remote Administration Tool Relay", "Potentially Bad Traffic", "Major", "Medium", "tls"),
-    9900003: ("EXAMPLE HTTP Basic Authorization over Cleartext", "Potential Corporate Privacy Violation", "Minor", "Medium", "http"),
-    9100001: ("LOCAL Possible DCSync - DRSUAPI DRSGetNCChanges from non-DC", "Credential Theft", "Critical", "High", "dcerpc"),
+    9900002: ("EXAMPLE TLS SNI of Remote Administration Tool Relay", "Potentially Bad Traffic",
+              "Major", "Medium", "tls"),
+    9900003: ("EXAMPLE HTTP Basic Authorization over Cleartext", "Potential Corporate Privacy Violation",
+              "Minor", "Medium", "http"),
+    9100001: ("LOCAL Possible DCSync - DRSUAPI DRSGetNCChanges from non-DC", "Credential Theft",
+              "Critical", "High", "dcerpc"),
 }
 
 
@@ -39,13 +43,14 @@ def week(rng, start, second):
         day = start + datetime.timedelta(days=d)
         workday = day.weekday() < 5
 
-        def at(h0, h1):
+        def at(h0, h1, day=day):
             return day + datetime.timedelta(seconds=rng.randrange(h0 * 3600, h1 * 3600))
 
         plan = [
             # (count, sid, src chooser, dst, port, hours)
             (260 if workday else 20, 2025701, lambda: rng.choice(CLIENTS), "10.10.20.15", 445, (8, 18)),
-            (30 if workday else 2, 2025701, lambda: rng.choice(CLIENTS), lambda: rng.choice(["10.10.0.10", "10.10.0.11"]), 445, (8, 10)),
+            (30 if workday else 2, 2025701, lambda: rng.choice(CLIENTS),
+             lambda: rng.choice(["10.10.0.10", "10.10.0.11"]), 445, (8, 10)),
             (40 if workday else 0, 2025709, lambda: rng.choice(CLIENTS), "10.10.20.30", 445, (8, 18)),
             (120, 9900001, lambda: rng.choice(CLIENTS), "10.10.0.53", 53, (0, 24)),
             (40 if second else 5, 9900002, lambda: "10.10.100.40", "203.0.113.50", 443, (0, 24)),

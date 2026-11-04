@@ -5,6 +5,7 @@
 /snapshots/
 /cards/
 /journal/
+/rules-cache/
 
 # Generated demo data
 examples/lab/data/
@@ -19,3 +20,6 @@ __pycache__/
 
 # Claude Code agent worktrees
 /.claude/worktrees/
+
+# Eval transcripts (claude plugin eval) - local only
+/evals/results/

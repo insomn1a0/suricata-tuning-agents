@@ -12,7 +12,7 @@ then `docs/PROCESS.md`. Lessons: `docs/PLAYBOOK.md`. Limits: `docs/SAFETY.md`.
 - Sensor: read-only through `sensor-collector`. Writes only via the `sensor-change` skill after an explicit yes.
 - Exceptions for hosts/routes live in Wazuh rules, not in Suricata. Unknown host -> ASK.
 - Rule IDs only from `$RULE_ID_RANGE`, checked against `wazuh/README.md`.
-- Label evidence (static / lint / logtest / pcap-lab / live-sensor / siem-query). Never claim more than ran.
+- Label evidence (static / lint / logtest / pcap-lab / sensor-lab / live-sensor / siem-query). Never claim more than ran.
 - Raw telemetry never leaves the sensor/laptop; no internal identifiers to web or external services.
 
 ## Tools

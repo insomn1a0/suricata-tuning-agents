@@ -23,7 +23,8 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python }}
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: ruff check .
       - run: make lint test-unit demo
 
   secrets:
@@ -51,6 +52,7 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt
       - run: make test-pcap
+      - run: make test-sensor-ro
 
   # Corpus -> Suricata -> EVE -> Wazuh logtest with the generated rules: every attack still visible.
   # Then each plausible-but-wrong intent in tests/corpus/mutants must make that fail.
@@ -63,5 +65,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - run: make test-e2e
+      - run: python tools/corpus_test.py --json corpus-result.json
       - run: make test-e2e-mutant
+      - if: always()
+        run: python tools/metrics.py --summary --corpus-result corpus-result.json

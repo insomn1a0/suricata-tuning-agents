@@ -17,7 +17,8 @@ class SpecTest(unittest.TestCase):
         topics = sorted(p.stem for p in TESTS.glob("*.expect"))
         self.assertTrue(topics)
         for topic in topics:
-            events = [l for l in (TESTS / f"{topic}.txt").read_text().splitlines() if l and not l.startswith("#")]
+            lines = (TESTS / f"{topic}.txt").read_text().splitlines()
+            events = [line for line in lines if line and not line.startswith("#")]
             for e in events:
                 self.assertEqual(json.loads(e)["event_type"], "alert")
             cases = check.parse_expect((TESTS / f"{topic}.expect").read_text())
@@ -37,7 +38,8 @@ class SpecTest(unittest.TestCase):
 
 class LintTest(unittest.TestCase):
     def test_catches_unanchored_and_literal_ip(self):
-        import tempfile, pathlib
+        import tempfile
+        import pathlib
         p = pathlib.Path(tempfile.mkdtemp()) / "bad.xml"
         p.write_text('<group name="x,"><rule id="100250" level="3"><if_sid>100206</if_sid>'
                      '<field name="alert.signature_id" type="pcre2">2025701</field>'

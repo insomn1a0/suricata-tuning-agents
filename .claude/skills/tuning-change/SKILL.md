@@ -17,7 +17,10 @@ Never edit `wazuh/rules/100220-suricata_tuning.xml`, `suricata/generated/` or `t
    - `rationale`, `risk`, `compensating_control`, `card` are required - they go into the rule comment.
    - `status: approved` is required (a draft is never rendered); `metadata` is the SID's real
      `signature_severity`/`confidence` from the rule text - it decides the ladder parent, and `wazuh.parent`
-     must be that leaf. `lower` needs `dst` + `dst_port` and level >= 1; `rate_limit` only for `enrich`,
+     must be that leaf. `make render` checks it against the rule text it can see: the repo's rules and
+     `$SURICATA_RULES_CACHE` (git-ignored). Add the SID's rule line to the cache first (sensor-collector:
+     `ssh -o BatchMode=yes "$SENSOR_SSH" "$SENSOR_SUDO grep -h 'sid:<SID>;' $SURICATA_RULES_FILE" >> "$SURICATA_RULES_CACHE"`);
+     the corpus run also compares it with what Suricata writes into EVE. `lower` needs `dst` + `dst_port` and level >= 1; `rate_limit` only for `enrich`,
      one address per route. Routes of different intents must not overlap: Wazuh picks among siblings by
      level (level 0 first, then higher), not by file order.
    - Rule IDs from `$RULE_ID_RANGE`, free in the repo, the registry (`wazuh/README.md`, never reuse retired
