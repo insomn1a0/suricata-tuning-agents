@@ -46,9 +46,39 @@ a broken version blocked every Edit (including the fix). Recovery is from the us
 
 Limits - it is a seatbelt, not a sandbox. It reads the command line Claude runs, not what a local script
 does inside (`bash evil.sh` is allowed); shell it cannot parse is asked about. **The boundary must be on the
-sensor**: a dedicated account whose sudoers entry allows only read commands on Suricata paths (no shell,
-no editors), ideally behind an ssh `ForceCommand` wrapper that accepts the same read forms. The guard makes
-the safe path frictionless and every other path visible to a human.
+sensor** - see below. The guard makes the safe path frictionless and every other path visible to a human.
+
+## The boundary on the sensor
+`tools/sensor_ro.py` is an ssh `ForceCommand` for the kit's read-only account (install: `deploy/sensor/`).
+sshd runs it for every login with that key, whatever command the laptop sent, so nothing on the laptop can
+bypass it. **No shell runs the command**: it is split into argv, the only operators are `|` (the pipeline is
+built in Python) and `2>/dev/null` / `2>&1`, so nothing expands and the checker cannot read the string
+differently from the executor. The first version validated and then ran `bash -c`; the review rejected it,
+and a mutant that restores `bash -c` deletes `suricata.yaml` in the lab test. The second version reused the
+guard's list of *dangerous* options, and the next review wrote files on the lab sensor with options nobody had
+listed (`sed --expression=w FILE`, `awk --dump-variables=FILE`, `ss -D FILE`). Now each allowed command has an
+allowlist of flags, and anything else is refused:
+
+| | laptop guard | sensor ForceCommand |
+|---|---|---|
+| unknown command | ask the user | refuse |
+| options | known-dangerous ones blocked | per-command allowlist of flags; any other option refused |
+| files in a pipeline | any stage | first stage only; later stages read stdin |
+| command given as a path (`/tmp/x/cat`) | parsed by name | refused; names resolve on a fixed PATH |
+| awk / sed programs | checked for dangerous constructs | exact shapes only: `awk [-F X] '{print $N, ...}'`, `sed -n 'Np'` |
+| paths | as written | real path; `/dev`, `/proc`, `/sys` and `//` refused; telemetry = anything under the log dir |
+| output, run time, written files | unlimited | 5 MB output, 120 s, 60 s CPU, files written by a child <= 8 MB, private TMPDIR |
+| `;`, `&&`, `$(...)`, backticks, globs, braces, `~` | parsed, often allowed | `;`/`&&`/`(` refused; the rest is a literal argument (no shell) |
+| interpreters, `env`, `xargs`, `find`, `jq --rawfile` | asked about | refused (only `python3 -m json.tool` on stdin) |
+| snapshot via stdin | allowed when the stdin path is the project's script | allowed only if the script's sha256 is pinned on the sensor |
+| unbounded raw EVE / pcap | ask | refuse |
+| decisions logged | no | syslog `auth`, tag `sensor-ro` |
+
+Read access itself should come from ACLs or group membership, not sudo (`deploy/sensor/README.md`); if sudo is
+unavoidable, `sudoers.example` lists exact commands without file wildcards. Evidence: `make test-sensor-ro` runs
+every case for real in a Suricata container - reads succeed, refused writes leave `suricata.yaml` unchanged,
+no option writes a file, a modified snapshot script does not run; mutating the wrapper (`bash -c` back, hash
+check off, flag allowlist off) fails it.
 
 ## Guard rails in the repo
 - `config/environment.env`, `inventory/hosts.md`, `snapshots/`, `cards/`, `journal/` are git-ignored.

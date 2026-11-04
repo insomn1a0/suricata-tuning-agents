@@ -9,7 +9,8 @@ TRACKED = {"README.md", "docs/SAFETY.md", "examples/cards/2025701.md", "wazuh/ru
 
 class LinksTest(unittest.TestCase):
     def test_resolves_relative_and_dirs(self):
-        text = "[a](docs/SAFETY.md) [b](examples/cards/2025701.md#decision) [c](wazuh/rules) [d](https://x.org) [e](#top)"
+        text = ("[a](docs/SAFETY.md) [b](examples/cards/2025701.md#decision) [c](wazuh/rules) "
+                "[d](https://x.org) [e](#top)")
         self.assertEqual(links.broken("README.md", text, TRACKED), [])
         self.assertEqual(links.broken("docs/SAFETY.md", "[r](../README.md) [s](./SAFETY.md)", TRACKED), [])
 

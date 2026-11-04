@@ -1,0 +1,12 @@
+# Tooling config only - the kit is not a package. Runtime dependency: requirements.txt (PyYAML).
+[tool.ruff]
+target-version = "py39"   # the sensor-side code runs on the system Python of the Suricata image (3.9)
+line-length = 120
+extend-exclude = [".drafts", ".claude/worktrees", "examples/lab/data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/unit/test_guard.py" = ["E501"]   # one tool call per row: the table reads better unwrapped
+"tests/unit/test_lab_data.py" = ["E501"]   # negative fixtures end in a lab-data marker, which must stay on the line

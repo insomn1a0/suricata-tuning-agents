@@ -53,7 +53,8 @@ def smb2_create(name, message_id=1):
     fname = name.encode("utf-16-le")
     # MS-SMB2 "SMB2 Packet Header - SYNC": 64 bytes, Command (offset 12) = 5 CREATE
     hdr = b"\xfeSMB" + struct.pack("<HHIHHIIQIIQ16s", 64, 1, 0, 5, 1, 0, 0, message_id, 0, 1, 0x10, b"\0" * 16)
-    body = struct.pack("<HBBIQQIIIIIHHII", 57, 0, 0, 2, 0, 0, 0x00120089, 0x80, 0x07, 1, 0x40, 64 + 56, len(fname), 0, 0)
+    body = struct.pack("<HBBIQQIIIIIHHII", 57, 0, 0, 2, 0, 0, 0x00120089, 0x80, 0x07, 1, 0x40, 64 + 56,
+                       len(fname), 0, 0)
     msg = hdr + body + fname
     return struct.pack(">I", len(msg)) + msg
 

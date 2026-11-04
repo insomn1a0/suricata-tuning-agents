@@ -32,7 +32,8 @@
 
 ## Evidence labels
 Every claim in a card or MR carries one label, and never more than what actually ran:
-`static` (read the rule/config) - `lint` - `logtest <version>` - `pcap-lab <version>` - `live-sensor`
+`static` (read the rule/config) - `lint` - `logtest <version>` - `pcap-lab <version>` - `sensor-lab <version>`
+(the sensor-side wrapper executed in a disposable Suricata container) - `live-sensor`
 (aggregates from production) - `siem-query` (indexer aggregation).
 
 ## Data
