@@ -1,0 +1,9 @@
+# /etc/sudoers.d/suricata-ro - ONLY if read access via ACLs/groups is not possible (see README.md).
+# Exact commands, no file wildcards: `/usr/bin/cat /var/log/suricata/*` would also allow ../../etc/shadow.
+# NOEXEC stops the listed programs from starting others.
+Defaults:suricata-ro !requiretty, env_reset
+suricata-ro ALL=(root) NOPASSWD:NOEXEC: /usr/bin/suricatasc -c dump-counters, \
+                                        /usr/bin/suricatasc -c uptime, \
+                                        /usr/bin/suricatasc -c iface-list, \
+                                        /usr/bin/suricata --build-info, \
+                                        /usr/bin/suricata -V
