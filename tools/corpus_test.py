@@ -2,8 +2,8 @@
 
 Engine stage (`--engine`, evidence label pcap-lab): Suricata replays each pcap offline in a disposable
 container with no network, with the generated threshold.config (suppress) and disable.conf applied, so
-Suricata-side intents are held to the same standard; test.yaml `checks` (suricata-verify syntax: filter / count / match on dotted
-EVE fields) must hold.
+Suricata-side intents are held to the same standard; test.yaml `checks` (suricata-verify syntax: filter /
+count / match on dotted EVE fields) must hold.
 End-to-end stage (default, adds evidence label logtest): the same alerts go through Wazuh logtest with the
 severity ladder and the rules GENERATED from tuning/intents; siem.yaml says what analysts must and must not
 see. "No attack lost": every case marked `attack:` must be visible.
@@ -82,6 +82,20 @@ def check_engine(events, spec):
     return problems
 
 
+def metadata_problems(alerts, intents):
+    """The metadata an intent declares must be what the engine reports in EVE for that SID - it decides the
+    ladder parent, so a wrong declaration means a tuning rule that never fires."""
+    declared = {sid: i["metadata"] for i in intents if "metadata" in i for sid in i["sids"]}
+    problems = []
+    for a in alerts:
+        sid = a.get("alert", {}).get("signature_id")
+        if sid in declared:
+            seen = {k: (a["alert"].get("metadata", {}).get(k) or [None])[0] for k in declared[sid]}
+            if seen != declared[sid]:
+                problems.append(f"SID {sid}: intent declares {declared[sid]}, EVE reports {seen}")
+    return sorted(set(problems))
+
+
 def logtest(alerts, wazuh_dir, work):
     """Run alerts through Wazuh logtest with the given rules dir; returns one result per alert."""
     events = work / "siem-events.txt"
@@ -105,7 +119,7 @@ def check_siem(alerts, results, spec):
         if not hits:  # never reached the SIEM (suppressed, disabled, not detected): counts as lost
             problems.append(f"{exp['name']}: no alert matched {exp['match']}")
             continue
-        for a, r in hits:
+        for _, r in hits:
             visible = bool(r.get("alert"))
             if visible != exp["visible"]:
                 problems.append(f"{exp['name']}: expected {'visible' if exp['visible'] else 'hidden'}, got rule "
@@ -152,25 +166,29 @@ def main(argv=None):
     p.add_argument("--case", action="append", help="run only these cases")
     p.add_argument("--extra-intent", help="render this intent in addition to tuning/intents")
     p.add_argument("--keep", action="store_true")
+    p.add_argument("--json", help="write the end-to-end summary here (tools/metrics.py --corpus-result)")
     args = p.parse_args(argv)
     if not shutil.which("docker"):
         print("NOT_RUN: docker not found - corpus was not executed")
         return 2
     cfg = kitconfig.load()
     suite = yaml.safe_load((CORPUS / "suite.yaml").read_text())
-    image = f"jasonish/suricata:{cfg['SURICATA_VERSION']}"
+    image = kitconfig.images(cfg)["SURICATA_IMAGE"]
     work = pathlib.Path(tempfile.mkdtemp(prefix="corpus-"))
     os.chmod(work, 0o777)
     intents = load_intents(args.extra_intent, work)
     build_suricata(intents, work)
     wazuh_dir = None if args.engine else build_rules(intents, args.extra_intent, work)
     cases = sorted(d for d in CORPUS.iterdir() if (d / "test.yaml").exists() and (not args.case or d.name in args.case))
-    print(f"engine: {subprocess.run(['docker', 'run', '--rm', '--entrypoint', 'suricata', image, '-V'], capture_output=True, text=True).stdout.strip()} ({image})")
+    version = subprocess.run(["docker", "run", "--rm", "--entrypoint", "suricata", image, "-V"],
+                             capture_output=True, text=True).stdout.strip()
+    print(f"engine: {version} ({image})")
     failed, total, engine = 0, collections.Counter(), "engine: not run"
     for case in cases:
         events = run_suricata(image, case, work, suite["vars"])
         problems = check_engine(events, yaml.safe_load((case / "test.yaml").read_text()))
         alerts = [e for e in events if e.get("event_type") == "alert"]
+        problems += metadata_problems(alerts, intents)
         if not args.engine and (case / "siem.yaml").exists():
             results, engine = logtest(alerts, wazuh_dir, work)
             more, summary = check_siem(alerts, results, yaml.safe_load((case / "siem.yaml").read_text()))
@@ -184,6 +202,12 @@ def main(argv=None):
         print(f"{engine}\nattacks visible {total['attack_ok']}/{total['attack_total']}, "
               f"noise hidden {total['noise_ok']}/{total['noise_total']}, "
               f"context as expected {total['context_ok']}/{total['context_total']}")
+    if args.json and not args.engine:
+        version = subprocess.run(["docker", "run", "--rm", "--entrypoint", "suricata", image, "-V"],
+                                 capture_output=True, text=True).stdout.strip().split("version ")[-1].split()[0:1]
+        pathlib.Path(args.json).write_text(json.dumps(
+            dict(total, suricata=" ".join(version), wazuh=engine.replace("engine: ", ""), failed_cases=failed),
+            indent=2) + "\n")
     if args.keep:
         print(f"work dir: {work}")
     else:
