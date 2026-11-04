@@ -1,0 +1,3 @@
+# ~suricata-ro/.ssh/authorized_keys on the sensor - one line per kit user key.
+# The forced command runs for every login with this key, whatever command was requested.
+command="/usr/local/bin/sensor-ro",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-user-rc ssh-ed25519 AAAA...replace-with-the-kit-user-public-key analyst@laptop
