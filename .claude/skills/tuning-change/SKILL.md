@@ -5,7 +5,8 @@ description: Turn an approved triage card into a tuning intent (tuning/intents/*
 # Tuning change
 
 The decision is the intent; XML, threshold.config and the logtest cases are generated from it.
-Never edit `wazuh/rules/100220-suricata_tuning.xml`, `suricata/generated/` or `tests/logtest/intent-*` by hand.
+Never edit `wazuh/rules/100220-suricata_tuning.xml`, `suricata/generated/`, `wazuh5/` or
+`tests/logtest/intent-*` by hand. On Wazuh 5 (experimental) read `wazuh5/GAPS.md` before deploying.
 
 1. Only for a card with status `approved`. Work on a feature branch; never commit/push without the user's explicit yes.
 2. **Write the intent** `tuning/intents/<id>.yaml` (schema: `tuning/schema.json`; examples next to it):

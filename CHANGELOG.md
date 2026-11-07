@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Real ET Open rules in the corpus (`make test-et-open`, CI job `real-ruleset`): fetched at test time from the
+  BSD-licensed SID range, never committed; intent metadata checked against the real rule text; mutants killed.
+- Corpus visibility means "seen at least once" (repeats archived by an ENRICH window are expected).
+- Sensor wrapper: own flag allowlists for ip, ethtool, suricata, suricatasc, rpm, dpkg (no longer delegated to
+  the guard); `suricata -T` refused - it wrote into the live log directory (review, reproduced in the lab).
+- Experimental Wazuh 5 adapter (`wazuh5/rules/*.yml`, `wazuh5/GAPS.md`) after the 5.0.0-rc2 migration guide:
+  LOWER as an exclusion in a per-SID rule, rate limits listed as gaps; rule model equals the 4.x cases; pySigma
+  syntax check.
+
+## 2026-11-04
+
 - Sensor-side boundary: `tools/sensor_ro.py` ssh ForceCommand - no shell, per-command flag allowlist, files only
   in the first pipeline stage, bounded raw telemetry, snapshot pinned by sha256, rlimits; `deploy/sensor/`;
   `make test-sensor-ro` (lab container). Five adversarial review rounds.

@@ -93,8 +93,14 @@ tests: {neighbour_sids: [2025709]}
 
 `make render` turns intents into Wazuh 4.x XML (`wazuh/rules/100220-suricata_tuning.xml`), Suricata
 `threshold.config`/`disable.conf`, and logtest cases derived from the intent: neighbour SIDs, prefix addresses
-on both sides, reverse direction, other port, crossed route pairs. Wazuh 5 drops XML rules; its adapter is a
-stub until the format is GA - the intents need no change.
+on both sides, reverse direction, other port, crossed route pairs.
+
+**Wazuh 5** (experimental, [`wazuh5/`](wazuh5/GAPS.md)): 5.0 drops XML rules and rule chaining - every Sigma rule
+is self-contained and every match is a finding. A child rule that lowers its parent cannot exist there, so the
+same intents render differently: a per-SID rule `rule.id: SID and not 1 of tuned_*` at the parent's level, plus
+an `informational` rule per lowered route. Rate limits (`ignore`) have no 5.0 equivalent and are listed as gaps.
+Written against the official migration guide for 5.0.0-rc2; a rule model shows the 5.x rules give the same
+visibility as the 4.x logtest cases, but nothing ran on a 5.x engine yet.
 
 ```xml
 <rule id="100220" level="3">
@@ -272,6 +278,7 @@ examples/            synthetic data generator, worked triage card
 | `test-pcap` | corpus `test.yaml` checks: signatures fire / stay silent on real packets, per session | CI, `jasonish/suricata:8.0.8` |
 | `test-e2e` | corpus → Suricata → Wazuh with the generated rules: every attack visible, noise hidden | CI, both images |
 | `test-e2e-mutant` | each plausible-but-wrong intent in `tests/corpus/mutants` makes `test-e2e` fail | CI, both images |
+| `test-et-open` | the corpus and mutants with the real ET Open rules; intent metadata checked against the real rule text | CI, downloads ET Open |
 | `test-sensor-ro` | the sensor-side ForceCommand, executed for real: reads work, writes leave the sensor unchanged, unpinned scripts do not run | CI, `jasonish/suricata:8.0.8` |
 
 Engine versions have one source, `tools/kitconfig.py` (overridden by `config/environment.env`, then by the
@@ -289,9 +296,12 @@ different production version, ruleset or traffic mix.
   against a production sensor - every engine result here is `logtest`, `pcap-lab` or `sensor-lab` evidence.
 - The README metrics come from the rule model (the one the generated logtest cases verify), because a replayed
   week cannot reproduce `ignore` windows in logtest.
-- The corpus detects its attacks with lab stand-ins for the ET rules (not vendored); it proves that tuning keeps
-  an attack visible, not that your ruleset detects it.
-- Wazuh 5.0 drops XML rules. The `wazuh5` adapter is a stub until the new format is GA; intents need no change.
+- The corpus runs twice: with lab stand-ins, and (`make test-et-open` in CI) with the real ET Open signatures,
+  downloaded at test time from the BSD-licensed range and never committed. It proves that tuning keeps an attack
+  visible when the real signature fires, not that your whole ruleset detects it.
+- Wazuh 5 output is experimental and not engine-verified: 5.0 is at rc2, its Suricata integration arrives
+  through Wazuh CTI at runtime and rules run in the indexer; WCS field paths are assumptions to confirm with
+  content-manager logtest (`wazuh5/GAPS.md`).
 - The guard reads command lines, not what a local script does - the boundary is the ForceCommand on the sensor.
 - The DCSync signature sees DCE/RPC over TCP; encrypted SMB3 transport is out of its sight.
 

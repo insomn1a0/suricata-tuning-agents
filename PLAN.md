@@ -124,14 +124,18 @@ Done when: a stranger can understand the project from the README in two minutes.
   a plan and a yes to it (0/2 -> 2/3). Single runs are noisy: one failure passed on re-run.
 - Mutation testing as a CI job: apply known-bad mutations (unanchor, drop `!$DC_SERVERS`, wrong opnum,
   widen a route) and assert the suites fail - turns the manual checks of Stage 1 into a guarantee. Fits Stage 4.
+- [x] Real ET Open rules in the corpus (`make test-et-open`, CI `real-ruleset`): downloaded at test time
+  (BSD range checked in the bundled LICENSE), stand-ins replaced; 4/4 attacks visible, 3/3 mutants killed.
 - [x] Intent metadata cross-checked: `make render` compares it with the rule text (repo rules + optional
   `SURICATA_RULES_CACHE`), the corpus run with the metadata Suricata writes into EVE.
 - [x] Sensor-side boundary: `tools/sensor_ro.py` as an ssh `ForceCommand` (same checks as the guard, stricter,
   snapshot pinned by sha256, syslog) + `deploy/sensor/` (install script, authorized_keys and sudoers examples);
-  `make test-sensor-ro` runs it for real in a Suricata container (55 checks; mutants that restore `bash -c`, drop
+  `make test-sensor-ro` runs it for real in a Suricata container (59 checks; mutants that restore `bash -c`, drop
   the hash check, the flag allowlist or the awk shape check are killed). Four review rounds (REJECT x4, each
   confirmed by real execution in the lab) shaped it: no shell; a per-command flag allowlist; files only in the
   first pipeline stage; exact awk/sed shapes; real paths; rlimits on children.
+  A sixth review (the checks it delegated to the guard) found that `suricata -T` writes into the live log
+  directory; all six commands now have own allowlists, `-T` is refused (59 lab checks).
 - Pin engine images by digest (tag + sha256) in kitconfig; dependabot/renovate for the Docker tags.
 - `ruff` + pre-commit (lint, lab-data guard) for contributors.
 - Release tags per stage (`v0.1.0` = green baseline) with a CHANGELOG.
@@ -141,4 +145,5 @@ Done when: a stranger can understand the project from the README in two minutes.
 ## Later (not now)
 - Behavioural analytics over EVE flow/krb5/dns (Kerberoasting, password spraying, DNS tunnelling, lateral fan-out).
 - Sensor health check as a Wazuh command monitor.
-- Wazuh 5 adapter once 5.0 is GA and its rule format is documented.
+- Wazuh 5 adapter: experimental version done against 5.0.0-rc2 (`wazuh5/`, model-verified); next - run it on a
+  5.x indexer + content-manager logtest once 5.0 is GA, confirm WCS field paths, drop the experimental label.

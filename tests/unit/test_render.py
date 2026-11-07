@@ -222,9 +222,47 @@ class Rendering(unittest.TestCase):
         intents = render.load_intents(render.INTENTS, 6, (100200, 100299))
         self.assertEqual(render.check_rule_metadata(intents, known), [])
 
-    def test_wazuh5_is_an_explicit_stub(self):
-        with self.assertRaises(NotImplementedError):
-            render.render_wazuh5([BASE])
+    def test_wazuh5_matches_wazuh4_on_the_generated_cases(self):
+        """Same events as the 4.x logtest files: visible in 4.x <=> a finding at or above `low` in 5.x.
+        The one known gap - repeats inside an ENRICH ignore window - is excluded and listed in GAPS.md."""
+        intents = render.load_intents(render.INTENTS, 6, (100200, 100299))
+        rules5, ladder_rules = render.wazuh5_rules(intents), render.ladder()
+        threshold = render.KEYWORD_ORDER.index(render.level_keyword(6))
+        compared = 0
+        for intent in intents:
+            fired = set()
+            for note, sid, ctx in render.test_cases(intent):
+                _, _, visible4 = render.expected(intents, ladder_rules, sid, ctx, intent["metadata"], fired, 6)
+                if "ignore window" in note:
+                    continue
+                levels = [render.KEYWORD_ORDER.index(r["level"]) for r in rules5.values()
+                          if render.sigma_match(r, render.wcs_doc(sid, ctx))]
+                tuned_sid = any(sid in i["sids"] for i in intents)
+                visible5 = max(levels) >= threshold if levels else None
+                if visible5 is None:  # SIDs without intents: the user's generic 5.x rules decide, as in 4.x
+                    self.assertFalse(tuned_sid, (intent["id"], note))
+                    continue
+                self.assertEqual(visible5, visible4, (intent["id"], note, levels))
+                compared += 1
+        self.assertGreater(compared, 15)
+
+    def test_wazuh5_rules_parse_as_sigma(self):
+        try:
+            from sigma.rule import SigmaRule
+        except ImportError:
+            self.skipTest("pySigma not installed (requirements-dev.txt)")
+        for rule in render.wazuh5_rules(render.load_intents(render.INTENTS, 6, (100200, 100299))).values():
+            sigma = SigmaRule.from_dict({"title": rule["metadata"]["title"], "logsource": rule["logsource"],
+                                         "level": rule["level"], "detection": rule["detection"]})
+            sigma.detection.parsed_condition[0].parse()
+
+    def test_wazuh5_lists_what_it_cannot_express(self):
+        gaps = render.wazuh5_gaps(render.load_intents(render.INTENTS, 6, (100200, 100299)), 6)
+        self.assertIn("smb-exe-domain-controllers", gaps)   # ignore 3600 has no 5.0 equivalent
+        self.assertIn("filter_tuned_sids", gaps)
+        self.assertEqual(render.level_keyword(3), "informational")
+        self.assertEqual(render.level_keyword(6), "low")
+        self.assertEqual(render.level_keyword(13), "high")
 
     def test_generated_files_are_current(self):
         self.assertEqual(render.main(["--check"]), 0, "run `make render`")
