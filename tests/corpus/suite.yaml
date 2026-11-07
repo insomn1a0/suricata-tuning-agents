@@ -3,3 +3,9 @@ vars:
   HOME_NET: "[10.10.0.0/16]"
   EXTERNAL_NET: "!$HOME_NET"
   DC_SERVERS: "[10.10.0.10,10.10.0.11]"
+
+# Real ET Open signatures (BSD-licensed range), fetched at test time by tools/fetch_et_rules.py and used by
+# `corpus_test.py --ruleset et-open` instead of the lab stand-ins with the same SID. Never committed.
+et_open:
+  sids: [2025701, 2025709]
+  expected_rev: {2025701: 2, 2025709: 2}

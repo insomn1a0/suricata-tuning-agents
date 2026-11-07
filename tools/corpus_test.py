@@ -12,7 +12,7 @@ Why not the suricata-verify runner itself: run.py expects a Suricata source/buil
 packaged engine image. The test.yaml subset used here is suricata-verify syntax, so cases can move there.
 
 Exit: 0 pass, 1 an expectation failed, 2 not run (no docker), 3 setup/engine error.
-Usage: corpus_test.py [--engine] [--case NAME] [--extra-intent FILE.yaml] [--keep]
+Usage: corpus_test.py [--engine] [--case NAME] [--extra-intent FILE.yaml] [--ruleset standins|et-open] [--keep]
   --extra-intent: render the intents plus this one into a temporary rule set (a deliberately bad intent
   must make the run fail - see `make test-e2e-mutant`)."""
 import argparse
@@ -34,6 +34,7 @@ import render
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CORPUS = ROOT / "tests" / "corpus"
 RULES = [ROOT / "suricata" / "rules" / "local.rules", CORPUS / "lab-standins.rules"]
+ET_RULES = ROOT / "rules-cache" / "et-open" / "selected.rules"
 
 
 def dotted(event, path):
@@ -72,13 +73,18 @@ def run_suricata(image, case_dir, work, variables):
     return [json.loads(line) for line in eve.read_text().splitlines() if line.strip()]
 
 
-def check_engine(events, spec):
+def check_engine(events, spec, replaced_sids=()):
+    """test.yaml checks. Counts are a property of the signature that fires: for SIDs replaced by the real ET
+    rule (which, on these synthetic sessions, also alerts at stream close) a positive count means "at least
+    one" - zero still means zero."""
     problems = []
     for n, chk in enumerate(spec.get("checks", []), 1):
         f = chk["filter"]
         got = sum(1 for e in events if matches(e, f.get("match", {})))
-        if got != f["count"]:
-            problems.append(f"check {n}: expected {f['count']} got {got} for {f.get('match')}")
+        relaxed = f.get("match", {}).get("alert.signature_id") in replaced_sids and f["count"] > 0
+        if (got < 1) if relaxed else (got != f["count"]):
+            want = "at least 1" if relaxed else f["count"]
+            problems.append(f"check {n}: expected {want} got {got} for {f.get('match')}")
     return problems
 
 
@@ -119,14 +125,18 @@ def check_siem(alerts, results, spec):
         if not hits:  # never reached the SIEM (suppressed, disabled, not detected): counts as lost
             problems.append(f"{exp['name']}: no alert matched {exp['match']}")
             continue
+        # Visible = an analyst sees it at least once (repeats inside an ENRICH ignore window are archived on
+        # purpose); hidden = no alert of it reaches the analyst.
+        seen = [bool(r.get("alert")) for _, r in hits]
+        ok = any(seen) if exp["visible"] else not any(seen)
+        if not ok:
+            r = hits[0][1]
+            problems.append(f"{exp['name']}: expected {'visible' if exp['visible'] else 'hidden'}, got rule "
+                            f"{r.get('id')} level {r.get('level')} {sum(seen)}/{len(seen)} alerts visible")
         for _, r in hits:
-            visible = bool(r.get("alert"))
-            if visible != exp["visible"]:
-                problems.append(f"{exp['name']}: expected {'visible' if exp['visible'] else 'hidden'}, got rule "
-                                f"{r.get('id')} level {r.get('level')} {'visible' if visible else 'hidden'}")
             if "rule" in exp and str(r.get("id")) != str(exp["rule"]):
                 problems.append(f"{exp['name']}: expected rule {exp['rule']}, got {r.get('id')}")
-        summary[f"{kind}_ok"] += all(bool(r.get("alert")) == exp["visible"] for _, r in hits)
+        summary[f"{kind}_ok"] += ok
     return problems, summary
 
 
@@ -139,14 +149,25 @@ def load_intents(extra_intent, work):
     return render.load_intents(intents_dir)
 
 
-def build_suricata(intents, work):
-    """Rules minus disabled SIDs, plus the threshold file - both rendered from the intents."""
+def sid_of(line):
+    m = re.search(r"\bsid:\s*(\d+)\s*;", line)
+    return m.group(1) if m and not line.lstrip().startswith("#") else None
+
+
+def build_suricata(intents, work, ruleset="standins"):
+    """Rules minus disabled SIDs, plus the threshold file - both rendered from the intents. With
+    ruleset=et-open the real ET Open rules (tools/fetch_et_rules.py) replace the stand-ins with the same SID."""
     generated = render.render_suricata(intents)
     (work / "threshold.config").write_text(generated["threshold.config"])
     disabled = set(re.findall(r"^1:(\d+)", generated["disable.conf"], re.M))
     rules = "".join(r.read_text() for r in RULES).splitlines()
-    kept = [line for line in rules if not (re.search(r"\bsid:(\d+);", line) and
-                                           re.search(r"\bsid:(\d+);", line).group(1) in disabled)]
+    if ruleset == "et-open":
+        if not ET_RULES.exists():
+            raise RuntimeError("run tools/fetch_et_rules.py first (rules-cache/et-open/selected.rules missing)")
+        real = ET_RULES.read_text().splitlines()
+        replaced = {sid_of(line) for line in real} - {None}
+        rules = [line for line in rules if sid_of(line) not in replaced] + real
+    kept = [line for line in rules if sid_of(line) not in disabled]
     (work / "all.rules").write_text("\n".join(kept) + "\n")
 
 
@@ -165,6 +186,8 @@ def main(argv=None):
     p.add_argument("--engine", action="store_true", help="Suricata checks only (no Wazuh)")
     p.add_argument("--case", action="append", help="run only these cases")
     p.add_argument("--extra-intent", help="render this intent in addition to tuning/intents")
+    p.add_argument("--ruleset", choices=["standins", "et-open"], default="standins",
+                   help="et-open: real ET Open rules (tools/fetch_et_rules.py) instead of the lab stand-ins")
     p.add_argument("--keep", action="store_true")
     p.add_argument("--json", help="write the end-to-end summary here (tools/metrics.py --corpus-result)")
     args = p.parse_args(argv)
@@ -177,7 +200,7 @@ def main(argv=None):
     work = pathlib.Path(tempfile.mkdtemp(prefix="corpus-"))
     os.chmod(work, 0o777)
     intents = load_intents(args.extra_intent, work)
-    build_suricata(intents, work)
+    build_suricata(intents, work, args.ruleset)
     wazuh_dir = None if args.engine else build_rules(intents, args.extra_intent, work)
     cases = sorted(d for d in CORPUS.iterdir() if (d / "test.yaml").exists() and (not args.case or d.name in args.case))
     version = subprocess.run(["docker", "run", "--rm", "--entrypoint", "suricata", image, "-V"],
@@ -186,7 +209,9 @@ def main(argv=None):
     failed, total, engine = 0, collections.Counter(), "engine: not run"
     for case in cases:
         events = run_suricata(image, case, work, suite["vars"])
-        problems = check_engine(events, yaml.safe_load((case / "test.yaml").read_text()))
+        replaced = ({int(s) for line in ET_RULES.read_text().splitlines() if (s := sid_of(line))}
+                    if args.ruleset == "et-open" else set())
+        problems = check_engine(events, yaml.safe_load((case / "test.yaml").read_text()), replaced)
         alerts = [e for e in events if e.get("event_type") == "alert"]
         problems += metadata_problems(alerts, intents)
         if not args.engine and (case / "siem.yaml").exists():
