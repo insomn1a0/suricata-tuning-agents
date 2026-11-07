@@ -28,7 +28,9 @@ class SensorRo(unittest.TestCase):
                     "grep -h 'sid:2025701;' /var/lib/suricata/rules/suricata.rules | head -3",
                     "head -n1 /var/log/suricata/eve.json | python3 -m json.tool",
                     "grep -c '|' /etc/hosts", "awk 'NR>1 {print $3}' /var/log/suricata/stats.log",
-                    "sed -n '1,5p' /etc/hosts", "tr -d x", "cut -d , -f 1 /etc/hosts | sort | uniq -c | head -n 5",
+                    "sed -n '1,5p' /etc/hosts", "tr -d x", "ip -br addr show", "ip route get 192.0.2.1",
+                    "ethtool -S eth1", "dpkg -l suricata",
+                    "rpm -qi suricata", "suricata -V", "cut -d , -f 1 /etc/hosts | sort | uniq -c | head -n 5",
                     "jq -c .alert.signature_id /var/log/suricata/eve.json | sort | uniq -c | sort -rn | head -n 20",
                     "journalctl -u suricata -n 50 --no-pager", "ls -la /var/log/suricata",
                     "true"):
@@ -59,7 +61,12 @@ class SensorRo(unittest.TestCase):
                     "head -n 5 --lines=100000 /var/log/suricata/eve.json",
                     "head -5 --bytes=4000000 /var/log/suricata/eve.json",
                     "journalctl -n 5 --lines=100000 -u suricata", "journalctl -u suricata --unit=ssh -n 5",
-                    "systemctl status suricata -n 100000", "id; id"):
+                    "systemctl status suricata -n 100000", "id; id",
+                    # delegated-checks review: suricata -T wrote eve.json/fast.log/suricata.log in the log dir
+                    "sudo -n suricata -T -c /etc/suricata/suricata.yaml", "suricatasc -c shutdown",
+                    "suricatasc -c version /run/docker.sock", "suricatasc -v -c uptime", "ip link set eth1 down",
+                    "ip -batch /tmp/x", "ip netns exec x id", "ethtool -K eth1 rx off", "ethtool -S -i eth1",
+                    "dpkg -l -x a b", "rpm -ivh x.rpm"):
             self.assertFalse(allowed(cmd), repr(cmd))
 
     def test_parse_is_what_runs(self):
