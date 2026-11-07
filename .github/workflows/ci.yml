@@ -54,6 +54,19 @@ jobs:
       - run: make test-pcap
       - run: make test-sensor-ro
 
+  # The same corpus with the real ET Open signatures (downloaded at test time, BSD-licensed range, never
+  # committed): intent metadata checked against the real rule text, attacks visible, mutants killed.
+  real-ruleset:
+    runs-on: ubuntu-24.04
+    needs: [wazuh-logtest, suricata-pcap]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: make test-et-open
+
   # Corpus -> Suricata -> EVE -> Wazuh logtest with the generated rules: every attack still visible.
   # Then each plausible-but-wrong intent in tests/corpus/mutants must make that fail.
   no-attack-lost:

@@ -66,6 +66,7 @@ allowlist of flags, and anything else is refused:
 | files in a pipeline | any stage | first stage only; later stages read stdin |
 | command given as a path (`/tmp/x/cat`) | parsed by name | refused; names resolve on a fixed PATH |
 | awk / sed programs | checked for dangerous constructs | exact shapes only: `awk [-F X] '{print $N, ...}'`, `sed -n 'Np'` |
+| `suricata -T` (config test) | allowed | refused - it opens every output and wrote eve.json/fast.log/suricata.log in the live log directory; config tests belong to `sensor-change` |
 | paths | as written | real path; `/dev`, `/proc`, `/sys` and `//` refused; telemetry = anything under the log dir |
 | output, run time, written files | unlimited | 5 MB output, 120 s, 60 s CPU, files written by a child <= 8 MB, private TMPDIR |
 | `;`, `&&`, `$(...)`, backticks, globs, braces, `~` | parsed, often allowed | `;`/`&&`/`(` refused; the rest is a literal argument (no shell) |

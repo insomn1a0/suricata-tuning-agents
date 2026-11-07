@@ -100,6 +100,10 @@ def main():
         ("head count given twice", "head -n 5 --lines=100000 /var/log/suricata/eve.json", b"", False, b""),
         ("head lines and bytes", "head -n 5 -c 4000000 /var/log/suricata/eve.json", b"", False, b""),
         ("onboarding probe", "id; id", b"", False, b""),
+        # delegated-checks review: `suricata -T` opened every output in the live log directory as root
+        ("suricata -T", "suricata -T -c /etc/suricata/suricata.yaml", b"", False, b""),
+        ("suricatasc shutdown", "suricatasc -c shutdown", b"", False, b""),
+        ("ip route get", "ip route get 127.0.0.1", b"", True, b""),
         ("stderr merged", "suricata --build-info 2>&1 | grep -c 'This is Suricata'", b"", True, b"1"),
         ("quoted semicolon", "grep -c 'vars:' /etc/suricata/suricata.yaml", b"", True, b"1"),
     ]
@@ -116,12 +120,15 @@ def main():
     print(f"{'PASS' if intact else 'FAIL'} suricata.yaml unchanged after all refused writes")
     failed += not intact
     created = sorted(f for f in os.listdir("/tmp") if f.startswith("sro-") and f != "sro-bin")
+    logs = sorted(set(os.listdir("/var/log/suricata")) - {"eve.json"})
+    print(f"{'PASS' if not logs else 'FAIL'} log directory untouched {logs or ''}")
+    failed += bool(logs)
     leftovers = sorted(f for f in os.listdir("/tmp") if f.startswith("sensor-ro-"))
     print(f"{'PASS' if not leftovers else 'FAIL'} no TMPDIR left behind {leftovers or ''}")
     failed += bool(leftovers)
     print(f"{'PASS' if not created else 'FAIL'} no file written by a refused option {created or ''}")
     failed += bool(created)
-    print(f"sensor-ro: {len(cases) + 3} checks, {failed} failed")
+    print(f"sensor-ro: {len(cases) + 4} checks, {failed} failed")
     return 1 if failed else 0
 
 

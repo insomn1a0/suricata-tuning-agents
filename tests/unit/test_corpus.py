@@ -91,6 +91,11 @@ class Evaluator(unittest.TestCase):
                            {"filter": {"count": 0, "match": {"alert.signature_id": 9100001, "src_port": 50002}}}]}
         self.assertEqual(runner.check_engine(self.EVENTS[:1], spec), [])
         self.assertEqual(len(runner.check_engine(self.EVENTS[1:], spec)), 2)
+        # with the real ET rule a positive count means "at least one"; zero still means zero
+        twice = self.EVENTS[:1] * 2
+        self.assertEqual(len(runner.check_engine(twice, spec)), 1)
+        self.assertEqual(runner.check_engine(twice, spec, replaced_sids={9100001}), [])
+        self.assertEqual(len(runner.check_engine(self.EVENTS, spec, replaced_sids={9100001})), 1)
 
     def test_siem_visibility(self):
         spec = {"expect": [{"name": "attack", "match": {"src_port": 50001}, "visible": True, "attack": "T1003.006"}]}
@@ -100,6 +105,11 @@ class Evaluator(unittest.TestCase):
         problems, summary = runner.check_siem(self.EVENTS[:1], hidden, spec)
         self.assertEqual(len(problems), 1)
         self.assertEqual((summary["attack_ok"], summary["attack_total"]), (0, 1))
+        # visible = seen at least once: a repeat archived inside an ENRICH ignore window is fine
+        problems, _ = runner.check_siem(self.EVENTS[:1] * 2, visible + hidden, spec)
+        self.assertEqual(problems, [])
+        noise = {"expect": [{"name": "noise", "match": {"src_port": 50001}, "visible": False}]}
+        self.assertEqual(len(runner.check_siem(self.EVENTS[:1] * 2, visible + hidden, noise)[0]), 1)
         # an attack suppressed before the SIEM is lost too, not missing from the total
         problems, summary = runner.check_siem([], [], spec)
         self.assertEqual((len(problems), summary["attack_ok"], summary["attack_total"]), (1, 0, 1))

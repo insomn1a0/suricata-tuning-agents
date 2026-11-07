@@ -20,3 +20,9 @@ stand-ins: `2025701` mimics the ET INFO SMB executable signature the tuning inte
 metadata), `9190001` (beacon-like repeated HTTP check-ins) and `9190002` (DNS labels of 40+ characters) are
 deliberately simple. They exist to prove that tuning does not hide an attack, not to detect one in production -
 real beaconing and tunnelling detection belongs to behavioural analytics (PLAN, "Later").
+
+`make test-et-open` swaps the stand-ins for the real ET Open rules with the same SIDs (2025701, 2025709;
+`tests/corpus/suite.yaml`), downloaded by `tools/fetch_et_rules.py` at test time: the bundled LICENSE must
+declare them BSD-licensed, and a changed `rev` is reported as drift. On the synthetic sessions the real 2025701
+alerts twice per session (on the data packet and at stream close) - exact counts are relaxed to "at least one"
+for those SIDs, visibility checks are unchanged.

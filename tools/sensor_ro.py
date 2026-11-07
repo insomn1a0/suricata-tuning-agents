@@ -17,6 +17,8 @@ runs it for every login of the key, whatever command was requested. Two adversar
     written file size are limited; awk and sed are accepted only in exact shapes.
   - The snapshot (`python3 -I - --days N ...` with the script on stdin) runs only if the script's sha256 is
     allowlisted. An optional exact `sudo -n` prefix passes through - sudoers decides what root may read.
+  - Every command has its own allowlist - nothing is delegated to the laptop guard's checks any more (a sixth
+    review found `suricata -T`, allowed there, writing log files in the live log directory).
 Every decision goes to syslog (auth, tag sensor-ro) with SSH_CONNECTION and, with ExposeAuthInfo, the key.
 
 Install (by the sensor's admin): deploy/sensor/README.md.
@@ -110,10 +112,18 @@ COMMANDS = {
                        longs={"--no-pager", "--utc", "--no-hostname"}, pos="none", needs_count=True),
     "dpkg-query": dict(flags="Wls", args={"-f", "--showformat"}, pos="words"),
     "python3": dict(pos="json.tool"),
-    # strict read-form checks already in the guard (option sets are explicit there)
-    "ip": dict(delegate=True), "ethtool": dict(delegate=True), "suricata": dict(delegate=True),
-    "suricatasc": dict(delegate=True), "rpm": dict(delegate=True), "dpkg": dict(delegate=True),
+    # Formerly delegated to the guard's checks; a review showed `suricata -T` (allowed there) writes eve.json,
+    # fast.log and suricata.log in the live log directory as root. Own allowlists now, no `-T` on this account.
+    "suricata": dict(flags="V", longs={"--build-info", "--list-keywords", "--list-app-layer-protos",
+                                       "--dump-config"}, pos="none"),
+    "suricatasc": dict(args={"-c"}, pos="none", needs_command=True),
+    "ip": dict(flags="sd46jpo", dash_words={"-br", "-brief", "-stats", "-details", "-json", "-pretty", "-oneline"},
+               pos="ip"),
+    "ethtool": dict(flags="SikglacTP", pos="ethtool"),
+    "rpm": dict(flags="qailfcd", pos="rpm"),
+    "dpkg": dict(flags="lsLS", pos="dpkg"),
 }
+IP_OBJECTS = {"link", "addr", "address", "route", "neigh", "neighbour", "rule"}
 # Long spellings map to one key, so `head -n 5 --lines=100000` is "given twice", not two options (review round 4).
 ALIASES = {"--lines": "-n", "--bytes": "-c", "--max-count": "-m", "--key": "-k", "--field-separator": "-t",
            "--delimiter": "-d", "--fields": "-f", "--unit": "-u", "--since": "-S", "--until": "-U",
@@ -239,6 +249,8 @@ def split_options(cmd, spec, args):
                 i += 1
             else:
                 raise Denied(f"`{cmd} {a}` needs a value")
+        elif a in spec.get("dash_words", ()):  # iproute2's single-dash long options
+            opts[a] = True
         elif cmd in ("head", "tail") and re.fullmatch(r"-\d+", a):
             set_once(opts, "-n", a[1:])
         elif all(c in flags for c in a[1:]):
@@ -287,11 +299,6 @@ def check_stage(argv, first):
     spec = COMMANDS.get(name)
     if spec is None:
         raise Denied(f"`{name}` is not on the sensor allowlist")
-    if spec.get("delegate"):
-        verdict = guard.remote_read_check(name, args)
-        if verdict:
-            raise Denied(verdict[1])
-        return [], False, False
     if spec.get("pos") == "json.tool":
         if args != ["-m", "json.tool"]:
             raise Denied("python3 only as `python3 -m json.tool` reading stdin")
@@ -315,6 +322,20 @@ def check_stage(argv, first):
     elif kind == "date":
         if any(not p.startswith("+") for p in pos):
             raise Denied("`date` with a value would set the clock")
+    elif kind == "ip":
+        verb = pos[1] if len(pos) > 1 else "show"
+        verbs = ("show", "list", "ls") + (("get",) if pos and pos[0] == "route" else ())
+        if not pos or pos[0] not in IP_OBJECTS or verb not in verbs:
+            raise Denied("ip forms: ip [-s -d -j -br ...] link|addr|route|neigh|rule show|list [filters]")
+    elif kind == "ethtool":
+        if len(pos) != 1 or len([o for o in opts if o.startswith("-")]) > 1:
+            raise Denied("ethtool forms: ethtool [one of -S -i -k -g -l -a -c -T -P] <interface>")
+    elif kind == "rpm":
+        if "-q" not in opts:
+            raise Denied("rpm queries only: rpm -q[ilfcd] <package>")
+    elif kind == "dpkg":
+        if len([o for o in opts if o.startswith("-")]) != 1:
+            raise Denied("dpkg forms: dpkg -l|-s|-L|-S <names>")
     elif kind == "ps":
         if any(p not in ("aux", "ax", "-ef") for p in pos):
             raise Denied("ps forms: aux, -ef, -o, -p")
@@ -328,6 +349,10 @@ def check_stage(argv, first):
         raise Denied(f"`{name} -n` needs a number")
     if name == "systemctl" and int(opts.get("-n", "0")) > MAX_LINES:
         raise Denied(f"`systemctl -n` at most {MAX_LINES} journal lines")
+    if spec.get("needs_command"):
+        command = str(opts.get("-c", ""))
+        if (command.split() or [""])[0] not in guard.SURICATASC_READ or len(command.split()) > 2:
+            raise Denied(f"suricatasc read commands only: {sorted(guard.SURICATASC_READ)}")
     if spec.get("needs_count"):
         count = str(opts.get("-n") or "")
         if not count.isdigit() or int(count) > MAX_LINES:
