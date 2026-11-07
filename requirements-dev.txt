@@ -1,2 +1,2 @@
 ruff==0.17.3
-pysigma==2.0.2
+pysigma==2.0.2; python_version >= "3.11"   # Sigma syntax check of wazuh5/ (skipped on 3.10)
