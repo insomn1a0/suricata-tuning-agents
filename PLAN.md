@@ -1,9 +1,10 @@
 # PLAN - from working prototype to a publishable project
 
-Read this file first in every session. Work stage by stage; one feature branch and one PR per stage.
-Tick tasks off here (`[x]`) as they are done and keep the "Status" line of each stage current.
+Read this file first in every session. One feature branch and one PR per piece of work; tick items off here and
+keep the status lines current. What happened in each stage, and why, is in [CHANGELOG.md](CHANGELOG.md) and
+[docs/WRITEUP.md](docs/WRITEUP.md) - keep this file short.
 
-## Hard constraints (apply to every stage)
+## Hard constraints
 
 - **Public repo, lab data only.** Addresses from 10.10.0.0/16 and documentation ranges (192.0.2.0/24,
   198.51.100.0/24, 203.0.113.0/24); hostnames `*.lab.local`. No data, names, addresses, configs or
@@ -11,139 +12,49 @@ Tick tasks off here (`[x]`) as they are done and keep the "Status" line of each 
 - Everything in git in English. Talk to the user in Russian.
 - Never claim a test passed unless it ran in this session or in CI; label evidence (docs/PLAYBOOK.md).
 - Never commit or push without the user's explicit "да". Small, reviewable commits.
-- The user wants to understand every decision: after each stage, explain in Russian in 5-10 lines what
-  changed and why, and list 2-3 questions an interviewer could ask about it.
+- After each piece of work, explain in Russian in 5-10 lines what changed and why (interview questions: at the
+  end of the project, as the user asked).
+- Do not grow the project for its own sake: add only what strengthens the core claim (cut noise without hiding
+  attacks, proven on the engines) or removes a real risk.
 
-## Background (researched 2026-11-03 - re-verify versions before pinning)
+## Background (re-verify versions before pinning)
 
-- Wazuh: latest stable 4.14.7; 5.0 is in beta. 5.0 drops XML rules (`etc/rules` does not exist; rules become
-  Sigma-style YAML in the indexer, decoders YAML assets). Migration of custom rules is the user's job.
-  -> The kit must not be married to 4.x XML: decisions are backend-neutral, XML is one adapter.
-- Claude Code: CLAUDE.md is context, not enforcement. A PreToolUse hook that exits with code 2 blocks the tool
-  call and shows stderr to Claude; any other non-zero exit does NOT block. Plugins bundle skills, agents, hooks
-  and MCP servers and install as one unit. Verify current syntax in https://code.claude.com/docs before writing.
-- Suricata: 8.0.x current. suricata-verify (OISF) is the standard pcap test format: `test.yaml` with `checks:`
-  of `filter: {count: N, match: {alert.signature_id: X}}`. Suricata 8 has the `requires` keyword.
-- Positioning: comparable projects put an LLM in the alert path (classify each alert at runtime).
-  This kit keeps the LLM offline: it proposes configuration changes, deterministic engines verify them,
-  no model runs in the alert path.
+- Wazuh 4.14.9 is the latest stable 4.x (2026-10-15). 5.0 is at rc2 (2026-10-30): no XML rules, no rule
+  chaining, Sigma-format rules evaluated in the indexer; the official 4.x->5.x migration guide is in the
+  wazuh/wazuh repo (docs/guide/migration/), unpublished. Decisions stay backend-neutral; XML is one adapter.
+- Suricata 8.0.8. suricata-verify needs a source/build tree, so the corpus uses its `test.yaml` syntax with a
+  minimal runner. ET Open SIDs 2000000-2799999 are BSD-licensed (LICENSE in the archive): fetched, not vendored.
+- Claude Code: CLAUDE.md is context, not enforcement. A PreToolUse hook exiting 2 blocks; `onFailure: "block"`
+  makes hook failures block too. Plugins load agents from `agents/`, not `.claude/agents` (hence the symlink).
 
-## Stage 1 - Green baseline
-Status: done (PR #1) - all four suites green locally (macOS arm64) and in CI; repo private until made public.
-- [x] `git init`, first commit of the current tree (after the user's yes), create GitHub repo `suricata-tuning-agents`.
-- [x] Run `make lint test-unit demo`, then `make test-logtest` and `make test-pcap` locally with Docker.
-      Fixed: CDB list ownership in the logtest container; analysisd fd limit on CI runners; pcap expectations
-      keyed by IP pair (a wrong-opnum signature passed - found by mutation); make's `-include` of the shell
-      env file kept quotes (-> `tools/kitconfig.py`).
-- [x] Bump default `WAZUH_VERSION` to the latest 4.14.x stable: 4.14.9 (2026-10-15, not 4.14.7); Suricata pinned 8.0.8.
-- [x] CI green on GitHub for all three jobs. Plus: SHA-pinned actions, least-privilege token, dependabot,
-      ubuntu-24.04 runner, lab-data-only guard (`tools/check_lab_data.py`) in `make lint`.
-Done when: all four suites pass locally and in CI; README test-status table matches reality.
+## Done
 
-## Stage 2 - Enforced safety (hooks) and plugin packaging
-Status: done - guard (68-case table, mutation-checked, live-session verified), plugin installs with 5 skills,
-5 agents, 1 hook.
-- [x] `.claude/hooks/guard.py` + registration in `.claude/settings.json` (PreToolUse, matcher Bash and file tools):
-      block (exit 2, clear stderr reason) - ssh to the sensor with write/restart/install verbs
-      (rm, mv, cp, tee, >, sed -i, systemctl, kill, apt/dnf/pip install, tcpreplay, suricatasc reload) unless
-      the command is the approved sensor-change path; `git push` / `git commit` (ask the user instead);
-      reading or printing `config/environment.env` secrets is fine but writing tokens/passwords into any file is not;
-      any command sending internal identifiers to the web (curl/wget with 10.x, hostnames from inventory).
-- [x] Fail closed: if the guard crashes, the call is blocked (check docs for the current option).
-      `onFailure: "block"` (>= 2.1.295) + exit 2 on any exception; both verified in a live session.
-      Design change: remote commands use an allowlist (unknown -> ask); the first denylist version let
-      vim, xargs rm, awk system(), tar -x, journalctl --vacuum, ip link set through. The reviewer then
-      REJECTED v2 (dozens of bypasses: loops, `bash -lc`, `sudo -s < script`, `systemctl stop x status`,
-      secrets in JSON); v3 recognises the safe path exactly and asks about the rest - all findings are table rows.
-- [x] Unit tests for the guard: table of commands -> allow/block (at least 25 cases, incl. tricky quoting,
-      `ssh host 'sudo -n cat x'` allowed vs `ssh host "sudo tee x"` blocked).
-- [x] Package agents, skills and hooks as a Claude Code plugin + marketplace manifest in this repo, so users
-      install with one command. Document install in README.
-      Agents under `.claude/` are not loaded by plugins (found by `claude plugin details`): `agents` is a
-      symlink to `.claude/agents`. Plugin mode lacks tools/ and CLAUDE.md -> `tools/init_workspace.sh`
-      (onboarding step 0).
-Done when: guard tests pass; plugin installs into a clean Claude Code session and the onboarding skill is visible.
-
-## Stage 3 - Backend-neutral tuning intents
-Status: done - two example intents render to the same rule behaviour (36/36 logtest cases on Wazuh 4.14.9, incl. the
-hand-written smb-tuning oracle); a renderer that drops `$` is caught by generated and hand cases alike.
-The reviewer REJECTED the first version (confirmed on 4.14.9): Wazuh orders siblings by level, not file
-order; rationale text could inject a rule; test events copied the parent's metadata. Fixed: engine-order
-model + overlap refusal, escaping + rule-ID assertion, intent carries the SID's real metadata and the parent
-must be the ladder leaf it lands on; status required; lower needs dst+port and level >= 1.
-- [x] Schema `tuning/schema.json` + one YAML file per decision in `tuning/intents/`, e.g. fields:
-      id, sid(s), action (lower|enrich|raise|suppress|disable), match {src, dst, dst_port, proto, direction},
-      rate_limit, visible_level, rationale, risk, compensating_control, card, tests {positive[], negative[]}.
-- [x] `tools/render.py` adapters: `wazuh4-xml` (generates wazuh/rules from intents - the current XML becomes generated),
-      `suricata-threshold` (threshold.config suppress/rate_filter + disable.conf), stub `wazuh5` with a clear TODO.
-- [x] Tests derive from intent: the negative-case generator automatically adds prefix-IP, reverse direction,
-      other port, neighbour SID and crossed pairs for multi-route intents. Logtest runs against generated XML.
-- [x] Document the trade-off: Suricata `suppress` removes the event entirely; Wazuh lowering keeps it in archives.
-- [x] Update skills (wazuh-rule-change -> tuning-change) and the example card to point at the intent.
-      Decisions made: PyYAML is the only dependency (`make venv`; sensor-side code stays stdlib); schema is
-      validated by a small built-in subset validator (no jsonschema); one rule per route; suppress refuses
-      contexts Suricata cannot pin; lint rejects `^a|b$` (top-level alternation); 110.10/16 is allowed (only in generated intent tests)
-      in lab data as the anchoring probe.
-Done when: `make render && make test` regenerates identical XML for the two example intents and all tests pass.
-
-## Stage 4 - Native Suricata tests in suricata-verify format + regression corpus
-Status: done - attacks visible 4/4 on Suricata 8.0.8 + Wazuh 4.14.9; three mutants killed in CI. The
-suppress mutant first survived and exposed a real bug: Suricata ignores threshold lines with a trailing
-comment (fixed in the renderer; the runner now fails on any engine `E:` line). The generated
-threshold.config and disable.conf are applied in every corpus run, so Suricata-side intents are covered.
-- [x] Convert `tests/pcap/` to suricata-verify layout (`tests/suricata/<name>/test.yaml`, `test.rules`, pcap)
-      and run it with the suricata-verify runner in Docker (or a compatible minimal runner if that is impractical -
-      document why).
-      Done as `tests/corpus/<case>/{input.pcap,test.yaml,siem.yaml}` with a minimal runner
-      (`tools/corpus_test.py`): suricata-verify's run.py expects a source/build tree, the kit tests the
-      packaged image. Rules and address groups are shared (`lab-standins.rules`, `suite.yaml`), not per test.
-- [x] Regression corpus `tests/corpus/`: synthetic pcaps (stdlib/scapy generators, no third-party captures
-      with unclear licence) for DCSync, SMB exe to admin share, periodic beacon to 203.0.113.x, DNS tunnelling-like
-      long labels. Each with the expected *visible* outcome after all intents are applied.
-- [x] CI job "no attack lost": corpus -> Suricata -> EVE -> Wazuh logtest with generated rules -> assert every corpus
-      attack is still visible (level >= WAZUH_ALERT_LEVEL).
-Done when: the end-to-end job is green and fails when a deliberately bad intent (e.g. lowering by subnet) is added.
+- **Stage 1 - green baseline** (#1, #2): all engine suites run locally and in CI; one config source; lab-data and
+  link checks.
+- **Stage 2 - enforced safety and plugin** (#3): PreToolUse guard, fail closed, two review rounds; plugin and
+  marketplace manifests.
+- **Stage 3 - backend-neutral intents** (#4): `make render` -> Wazuh 4.x XML, Suricata threshold/disable, tests
+  derived from the intent; engine-order model, escaping, real metadata after a rejected review.
+- **Stage 4 - regression corpus** (#5): attacks must stay visible through Suricata and Wazuh with the generated
+  rules; mutants must be caught (a surviving one exposed the threshold.config comment bug).
+- **Beyond the stages** (#6, #7): sensor-side ForceCommand (six review rounds); metadata checked against rule
+  text and EVE; generated metrics and ATT&CK layer; agent evals; images pinned by digest; ruff; real ET Open rules
+  in CI; experimental Wazuh 5 adapter.
 
 ## Stage 5 - Presentation
-Status: in progress - metrics and ATT&CK layer done; README restructure, demo recording and write-up open.
-- [x] Metrics in CI on demo data: visible alerts/day before vs after intents; corpus attacks visible N/N.
-      Print as a job summary and as a README table generated by a script (no hand-typed numbers).
-      `tools/metrics.py`: demo week through the rule model (ignore windows by event time) -> README block
-      (checked in lint); CI job summary adds the engine-verified corpus result from `corpus_test.py --json`.
-      Computed 367.4 -> 157.1 visible/day (-57%); 2025701 -> 3.6/day (the hand-typed ~2.5 predated the per-DC split).
-- [x] ATT&CK Navigator layer generated from local signatures + corpus coverage (`tools/attack_layer.py`,
-      `docs/attack-layer.json`, checked in lint).
-- [ ] README: lead with the positioning (LLM offline, engines verify), architecture diagram, 60-second demo GIF
-      or asciinema of `make demo` + one triage card, honest limitations, Wazuh 5 status.
-- [x] Short write-up `docs/WRITEUP.md` (later a blog post): problem, approach, what the tests caught.
+Status: done (v0.1.0).
+- [x] Metrics generated by a script (README block + CI job summary); ATT&CK layer; `docs/WRITEUP.md`.
+- [x] README rewritten around "understand it in two minutes": positioning, one example, what is proven, quick
+      start, safety, limitations (151 lines; details live in docs/).
+- [x] Release `v0.1.0` with the CHANGELOG as notes.
 Done when: a stranger can understand the project from the README in two minutes.
 
-## Ideas found along the way (pick into a stage when it fits)
-- [x] Agent evals (`evals/`, `make evals`, opt-in): five LLM-graded cases for the PLAYBOOK lessons. Found a real
-  weakness - "just disable it" was taken as approval of a sensor change; the sensor-change skill now requires
-  a plan and a yes to it (0/2 -> 2/3). Single runs are noisy: one failure passed on re-run.
-- Mutation testing as a CI job: apply known-bad mutations (unanchor, drop `!$DC_SERVERS`, wrong opnum,
-  widen a route) and assert the suites fail - turns the manual checks of Stage 1 into a guarantee. Fits Stage 4.
-- [x] Real ET Open rules in the corpus (`make test-et-open`, CI `real-ruleset`): downloaded at test time
-  (BSD range checked in the bundled LICENSE), stand-ins replaced; 4/4 attacks visible, 3/3 mutants killed.
-- [x] Intent metadata cross-checked: `make render` compares it with the rule text (repo rules + optional
-  `SURICATA_RULES_CACHE`), the corpus run with the metadata Suricata writes into EVE.
-- [x] Sensor-side boundary: `tools/sensor_ro.py` as an ssh `ForceCommand` (same checks as the guard, stricter,
-  snapshot pinned by sha256, syslog) + `deploy/sensor/` (install script, authorized_keys and sudoers examples);
-  `make test-sensor-ro` runs it for real in a Suricata container (59 checks; mutants that restore `bash -c`, drop
-  the hash check, the flag allowlist or the awk shape check are killed). Four review rounds (REJECT x4, each
-  confirmed by real execution in the lab) shaped it: no shell; a per-command flag allowlist; files only in the
-  first pipeline stage; exact awk/sed shapes; real paths; rlimits on children.
-  A sixth review (the checks it delegated to the guard) found that `suricata -T` writes into the live log
-  directory; all six commands now have own allowlists, `-T` is refused (59 lab checks).
-- Pin engine images by digest (tag + sha256) in kitconfig; dependabot/renovate for the Docker tags.
-- `ruff` + pre-commit (lint, lab-data guard) for contributors.
-- Release tags per stage (`v0.1.0` = green baseline) with a CHANGELOG.
-- Observed: the `wazuh/wazuh-manager:4.14.9` image reports `WAZUH_REVISION="rc2"`; keep the engine-reported
-  version in evidence labels, not the tag.
-
-## Later (not now)
-- Behavioural analytics over EVE flow/krb5/dns (Kerberoasting, password spraying, DNS tunnelling, lateral fan-out).
-- Sensor health check as a Wazuh command monitor.
-- Wazuh 5 adapter: experimental version done against 5.0.0-rc2 (`wazuh5/`, model-verified); next - run it on a
-  5.x indexer + content-manager logtest once 5.0 is GA, confirm WCS field paths, drop the experimental label.
+## Later - only if it earns its place
+- Run the Wazuh 5 output on a 5.x indexer + content-manager logtest once 5.0 is GA; confirm the WCS field paths.
+- Behavioural analytics over EVE flow/krb5/dns (Kerberoasting, password spraying, lateral fan-out) - a separate
+  project-sized stage, not a tuning feature.
+- Sensor health check (capture drops, stale EVE) as a Wazuh command monitor.
+- One policy module shared by the laptop guard and the sensor ForceCommand (today the sensor's allowlist is
+  stricter and authoritative; merging them is a refactor of reviewed security code - do it with a review).
+- Considered and dropped: a demo GIF (the README shows real command output), more eval cases or mutants (the
+  current ones cover the PLAYBOOK lessons), per-test suricata-verify rule files (shared rules are simpler).
