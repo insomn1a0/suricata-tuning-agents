@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## v0.1.0 - 2026-11-08
+
+First release: stages 1-5 of PLAN.md. Lab-tested only (logtest, pcap-lab, sensor-lab evidence).
+
+- README rewritten around "understand it in two minutes"; PLAN trimmed (history lives here and in WRITEUP).
 
 - Real ET Open rules in the corpus (`make test-et-open`, CI job `real-ruleset`): fetched at test time from the
   BSD-licensed SID range, never committed; intent metadata checked against the real rule text; mutants killed.
