@@ -61,7 +61,7 @@ Three points where a review changed or questioned a proposal:
   leaf, so no RAISE rule could attach. Ladder leaf 100207 (level 3, hidden as before) fixed it.
 - **9900001**: the intent has the same shape (dst resolver + 53) as the corpus mutant `lower-internal-resolver`,
   with the opposite decision. That is the point: the question is what the analyst does, not where the event goes.
-  The corpus has to show the difference (step 5).
+  The corpus guards it: the tunnel signature must still fire through that resolver (step 5).
 - **2210020**: with the owner's counters confirmed, the human decision was DISABLE - 471 events a day of archive
   and indexer load. The adversarial `reviewer` rejected it: out-of-window packets are exactly what the stream engine
   does not reassemble, so in an insertion attempt this event is the only trace, and the counters show loss per
@@ -136,13 +136,13 @@ events stay visible. Table: [README](../README.md#one-example).
 ## 7. The same snapshot over ssh
 
 `make test-sensor-ssh` builds a lab sensor the way [`deploy/sensor/`](../deploy/sensor/README.md) tells an
-administrator to (read-only account, the README's ACL commands verbatim, `install.sh`, the line from
+administrator to (read-only account, the ACL commands read from its README, `install.sh`, the line from
 `authorized_keys.example`) and runs the kit's `tools/snapshot.sh` from an analyst container:
 
 ```
 PASS tools/snapshot.sh over ssh
 PASS remote snapshot equals local (6118 alerts, 6 SIDs)
-PASS rotated file read via the default ACL
+PASS rotated files read via the default ACL and counted (6118 > 3059 live)
 PASS bounded EVE read
 PASS config read
 PASS second command refused

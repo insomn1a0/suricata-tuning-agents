@@ -108,6 +108,9 @@ class Registry(unittest.TestCase):
         self.assertEqual(raise_["routes"], [{}])
         self.assertEqual(render.check_semantics(raise_, 6, RULES), [])
         self.assertFalse([n for n, _, _ in render.test_cases(raise_) if "other protocol" in n])
+        windowed = render.whole_sid(intent(id="lab-enrich", action="enrich", level=6, routes=None,
+                                           rate_limit={"ignore_seconds": 3600}))
+        self.assertTrue([e for e in render.check_semantics(windowed, 6, RULES) if "src or dst" in e])
         lower = render.whole_sid(intent(routes=None))
         self.assertIn("action lower needs 'routes'", render.check_semantics(lower, 6, RULES))
 

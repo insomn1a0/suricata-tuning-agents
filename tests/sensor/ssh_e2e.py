@@ -25,7 +25,8 @@ import make_sample_eve  # noqa: E402
 
 IMAGE = "sro-lab-sensor:local"
 CONTEXT = ["tools/sensor_ro.py", "tools/sensor_snapshot.py", ".claude/hooks/guard.py", "deploy/sensor/install.sh",
-           "deploy/sensor/authorized_keys.example", "deploy/lab-sensor/entrypoint.sh", "deploy/lab-sensor/Dockerfile"]
+           "deploy/sensor/authorized_keys.example", "deploy/sensor/README.md",
+           "deploy/lab-sensor/entrypoint.sh", "deploy/lab-sensor/Dockerfile"]
 SNAP_ARGS = "--days 7 --logdir '/var/log/suricata' --pattern 'eve.json*' --work-hours '8-19'"
 
 
@@ -37,15 +38,19 @@ def sh(*cmd, stdin=None, check=False):
 
 
 def lab_data(tmp):
-    """Two demo weeks ending today: week 2 is eve.json, week 1 the rotated eve.json.1.gz."""
+    """Two demo weeks ending today, rotated like a sensor: the newer half of week 2 is eve.json, the older half
+    eve.json.1.gz (inside the 7-day window, so the snapshot must count it), week 1 eve.json.2.gz."""
     first = (datetime.date.today() - datetime.timedelta(days=13)).isoformat()
     make_sample_eve.main(str(tmp / "gen"), first)
     eve = tmp / "eve"
     eve.mkdir()
-    shutil.copy(tmp / "gen" / "week2" / "eve.json", eve / "eve.json")
-    with open(tmp / "gen" / "week1" / "eve.json", "rb") as f, gzip.open(eve / "eve.json.1.gz", "wb") as g:
-        g.write(f.read())
-    return eve
+    week2 = (tmp / "gen" / "week2" / "eve.json").read_bytes().splitlines(keepends=True)
+    (eve / "eve.json").write_bytes(b"".join(week2[len(week2) // 2:]))
+    for name, data in (("eve.json.1.gz", b"".join(week2[:len(week2) // 2])),
+                       ("eve.json.2.gz", (tmp / "gen" / "week1" / "eve.json").read_bytes())):
+        with gzip.open(eve / name, "wb") as g:
+            g.write(data)
+    return eve, len(week2) - len(week2) // 2
 
 
 def build(tmp, image):
@@ -72,7 +77,7 @@ def main():
         print(f"{'PASS' if ok else 'FAIL'} {name}" + ("" if ok else f": {detail[:400]!r}"))
 
     try:
-        eve = lab_data(tmp)
+        eve, live_alerts = lab_data(tmp)
         sh("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "analyst@lab", "-f", str(tmp / "id"), check=True)
         shutil.copy(tmp / "id.pub", tmp / "kit.pub")
         try:
@@ -129,9 +134,10 @@ def main():
             same = {k: remote[k] == local[k] for k in ("alerts", "visible", "sids")}
             check(f"remote snapshot equals local ({remote['alerts']} alerts, {len(remote['sids'])} SIDs)",
                   all(same.values()) and remote["alerts"] > 0, json.dumps(same).encode())
-            # the rotated file is created after the ACLs with mode 0640: readable only through the default ACL
-            check("rotated file read via the default ACL", len(remote["files"]) == 2,
-                  json.dumps(remote["files"]).encode())
+            # rotated files are created after the ACLs with mode 0640: readable only through the default ACL;
+            # the older half of week 2 is inside the window, so the count must exceed the live file's
+            check(f"rotated files read via the default ACL and counted ({remote['alerts']} > {live_alerts} live)",
+                  len(remote["files"]) == 3 and remote["alerts"] > live_alerts, json.dumps(remote["files"]).encode())
 
         # 2. bounded reads the sensor-collector uses
         r = ssh("tail -n 5 /var/log/suricata/eve.json | wc -l")

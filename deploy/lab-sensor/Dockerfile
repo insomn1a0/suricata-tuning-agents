@@ -9,7 +9,7 @@ RUN dnf -y -q install openssh-server openssh-clients acl && dnf clean all
 # The kit files install.sh expects, at their repo paths
 COPY tools/sensor_ro.py tools/sensor_snapshot.py /opt/kit/tools/
 COPY .claude/hooks/guard.py /opt/kit/.claude/hooks/
-COPY deploy/sensor/install.sh deploy/sensor/authorized_keys.example /opt/kit/deploy/sensor/
+COPY deploy/sensor/install.sh deploy/sensor/authorized_keys.example deploy/sensor/README.md /opt/kit/deploy/sensor/
 COPY deploy/lab-sensor/entrypoint.sh /usr/local/sbin/lab-sensor
 
 RUN useradd --system --create-home --shell /bin/bash suricata-ro \

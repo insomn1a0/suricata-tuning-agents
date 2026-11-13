@@ -188,6 +188,9 @@ def check_semantics(intent, alert_level, rules=None):
             if action != "enrich":
                 errors.append("rate_limit only for enrich: `ignore` is global for the rule and would hide repeats "
                               "the parent alerts on")
+            if any(not {"src", "dst"} & set(r) for r in routes):
+                errors.append("rate_limit needs src or dst in every route: one ignore window for every host would "
+                              "hide a second host behind the first")
             if any(len(as_list(r.get(k, []))) > 1 for r in routes for k in ("src", "dst")):
                 errors.append("rate_limit needs one address per route field: all addresses of a route share one "
                               "ignore window")
