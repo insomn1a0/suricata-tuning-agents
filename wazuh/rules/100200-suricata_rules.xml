@@ -60,4 +60,13 @@
     <group>suricata,minor,high_confidence,</group>
   </rule>
 
+  <!-- Hidden, but a leaf: a RAISE intent needs a parent no ladder sibling can take the event from -->
+  <rule id="100207" level="3">
+    <if_sid>86601</if_sid>
+    <field name="alert.metadata.signature_severity">Minor</field>
+    <field name="alert.metadata.confidence">Medium</field>
+    <description>Suricata Minor / Medium confidence: $(alert.signature)</description>
+    <group>suricata,minor,medium_confidence,</group>
+  </rule>
+
 </group>

@@ -23,3 +23,6 @@ __pycache__/
 
 # Eval transcripts (claude plugin eval) - local only
 /evals/results/
+
+# Personal Claude Code settings (e.g. hooks off while developing the kit) - local only
+/.claude/settings.local.json

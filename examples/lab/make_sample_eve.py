@@ -1,5 +1,6 @@
 """Generate two weeks of synthetic Suricata EVE alerts for the demo (deterministic, lab addresses).
-Usage: make_sample_eve.py <out-dir>   -> <out-dir>/week1/eve.json, <out-dir>/week2/eve.json
+Usage: make_sample_eve.py <out-dir> [start]  -> <out-dir>/week1/eve.json, <out-dir>/week2/eve.json
+start: first day, YYYY-MM-DD (default 2026-01-05, a Monday); the lab sensor dates its data relative to today.
 SIDs 99000xx are fictional (rule text: examples/lab/demo.rules); 2025701/2025709 are ET INFO SMB signatures;
 9100001 is the local DCSync signature from suricata/rules/local.rules."""
 import datetime
@@ -69,9 +70,9 @@ def week(rng, start, second):
     return out
 
 
-def main(dest):
+def main(dest, first="2026-01-05"):
     rng = random.Random(42)
-    start = datetime.datetime(2026, 1, 5, tzinfo=TZ)  # Monday
+    start = datetime.datetime.strptime(first, "%Y-%m-%d").replace(tzinfo=TZ)
     for i, name in enumerate(("week1", "week2")):
         d = pathlib.Path(dest) / name
         d.mkdir(parents=True, exist_ok=True)
@@ -83,4 +84,4 @@ def main(dest):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "examples/lab/data")
+    main(*(sys.argv[1:3] or ["examples/lab/data"]))

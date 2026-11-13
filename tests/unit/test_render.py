@@ -133,7 +133,8 @@ class EngineModel(unittest.TestCase):
         self.assertEqual(render.ladder_select(RULES, {"signature_severity": "Minor", "confidence": "High"}), "100206")
         critical = {"signature_severity": "Critical", "confidence": "High"}
         self.assertEqual(render.ladder_select(RULES, critical), "100202")
-        self.assertEqual(render.ladder_select(RULES, {"signature_severity": "Minor", "confidence": "Medium"}), "86601")
+        self.assertEqual(render.ladder_select(RULES, {"signature_severity": "Minor", "confidence": "Medium"}), "100207")
+        self.assertEqual(render.ladder_select(RULES, {"signature_severity": "Minor", "confidence": "Low"}), "86601")
 
 
 class Rendering(unittest.TestCase):

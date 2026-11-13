@@ -28,7 +28,7 @@ class LadderTest(unittest.TestCase):
         cases = {("Critical", "High"): ("100202", 13), ("Critical", "Medium"): ("100201", 11),
                  ("Critical", "-"): ("100200", 10), ("Major", "High"): ("100205", 9),
                  ("Major", "Medium"): ("100204", 8), ("Major", "Low"): ("100203", 7),
-                 ("Minor", "High"): ("100206", 6), ("Minor", "Medium"): ("86601", 3),
+                 ("Minor", "High"): ("100206", 6), ("Minor", "Medium"): ("100207", 3),
                  ("-", "-"): ("86601", 3)}
         for (sev, conf), want in cases.items():
             self.assertEqual(snap.predicted(sev, conf), want, (sev, conf))

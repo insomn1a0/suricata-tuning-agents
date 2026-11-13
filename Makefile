@@ -5,7 +5,7 @@ export PY
 # Config (engine versions, alert level, ID range) is read by tools/kitconfig.py, not by make:
 # environment.env is shell syntax. Override per run: make test-logtest WAZUH_VERSION=4.14.8
 
-.PHONY: help venv render demo lint test test-unit test-logtest test-pcap test-e2e test-e2e-mutant test-et-open test-sensor-ro metrics attack-layer evals snapshot diff clean
+.PHONY: help venv render demo lint test test-unit test-logtest test-pcap test-e2e test-e2e-mutant test-et-open test-sensor-ro test-sensor-ssh metrics attack-layer evals snapshot diff clean
 
 help:
 	@echo "make venv          local virtualenv with requirements.txt (PyYAML for tuning intents)"
@@ -94,7 +94,12 @@ test-sensor-ro:
 	  -v "$(CURDIR)/tests/sensor:/tests:ro" \
 	  "$$($(PY) tools/kitconfig.py | sed -n 's/^SURICATA_IMAGE=//p')" /tests/run_cases.py
 
-test: lint test-unit test-logtest test-pcap test-e2e test-e2e-mutant test-sensor-ro
+# The whole ssh path: sshd, authorized_keys forced command, install.sh, tools/snapshot.sh (evidence: sensor-lab).
+# Builds a lab image from the pinned Suricata image + distro openssh (needs network for the build only).
+test-sensor-ssh:
+	$(PY) tests/sensor/ssh_e2e.py
+
+test: lint test-unit test-logtest test-pcap test-e2e test-e2e-mutant test-sensor-ro test-sensor-ssh
 
 snapshot:
 	tools/snapshot.sh 7

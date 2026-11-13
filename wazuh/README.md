@@ -15,12 +15,13 @@ Analyst-visible level in this kit: 6 (`WAZUH_ALERT_LEVEL`).
 | 100204 | 8 | 100203 | Major / Medium confidence | severity-ladder |
 | 100205 | 9 | 100203 | Major / High confidence | severity-ladder |
 | 100206 | 6 | 86601 | Minor / High confidence | severity-ladder |
+| 100207 | 3 | 86601 | Minor / Medium confidence (hidden; parent for RAISE) | severity-ladder |
 | 100220 | 3 | 100206 | 2025701 on software distribution share (LOWER) | intent smb-exe-distribution-share, smb-tuning |
 | 100221 | 6, ignore 3600 | 100206 | 2025701 on dc1 (ENRICH, rate-limited) | intent smb-exe-domain-controllers, smb-tuning |
 | 100222 | 6, ignore 3600 | 100206 | 2025701 on dc2 (ENRICH, rate-limited) | intent smb-exe-domain-controllers |
 | 100228 | 3 | 100204 | corpus mutant only - never deployed | tests/corpus/mutants/lower-internal-resolver.yaml |
 | 100229 | 3 | 100206 | corpus mutant only - never deployed | tests/corpus/mutants/lower-admin-workstation.yaml |
 
-Held: 100207-100219 (ladder extensions).
+Held: 100208-100219 (ladder extensions).
 Retired: none. Never reuse a retired ID.
-`tools/sensor_snapshot.py::predicted()` mirrors 100200-100206 - change both together.
+`tools/sensor_snapshot.py::predicted()` mirrors 100200-100207 - change both together.
