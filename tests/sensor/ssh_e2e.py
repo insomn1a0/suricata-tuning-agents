@@ -25,7 +25,7 @@ import make_sample_eve  # noqa: E402
 
 IMAGE = "sro-lab-sensor:local"
 CONTEXT = ["tools/sensor_ro.py", "tools/sensor_snapshot.py", ".claude/hooks/guard.py", "deploy/sensor/install.sh",
-           "deploy/lab-sensor/entrypoint.sh", "deploy/lab-sensor/Dockerfile"]
+           "deploy/sensor/authorized_keys.example", "deploy/lab-sensor/entrypoint.sh", "deploy/lab-sensor/Dockerfile"]
 SNAP_ARGS = "--days 7 --logdir '/var/log/suricata' --pattern 'eve.json*' --work-hours '8-19'"
 
 
@@ -129,7 +129,9 @@ def main():
             same = {k: remote[k] == local[k] for k in ("alerts", "visible", "sids")}
             check(f"remote snapshot equals local ({remote['alerts']} alerts, {len(remote['sids'])} SIDs)",
                   all(same.values()) and remote["alerts"] > 0, json.dumps(same).encode())
-            check("both rotated files read", len(remote["files"]) == 2, json.dumps(remote["files"]).encode())
+            # the rotated file is created after the ACLs with mode 0640: readable only through the default ACL
+            check("rotated file read via the default ACL", len(remote["files"]) == 2,
+                  json.dumps(remote["files"]).encode())
 
         # 2. bounded reads the sensor-collector uses
         r = ssh("tail -n 5 /var/log/suricata/eve.json | wc -l")
@@ -138,18 +140,24 @@ def main():
         check("config read", r.returncode == 0 and r.stdout.strip() == b"1", r.stderr or r.stdout)
 
         # 3. what the boundary must refuse, whatever the laptop sends
-        check("second command refused", denied(ssh("id; id")), ssh("id; id").stdout)
-        r = ssh("rm -f /etc/suricata/suricata.yaml")
-        check("write refused", denied(r), r.stderr)
+        r = ssh("id; id")
+        check("second command refused", denied(r), r.stdout + r.stderr)
+        # a file the account CAN write (its own authorized_keys): only the boundary stops the delete
+        keys = "/home/suricata-ro/.ssh/authorized_keys"
+        r = ssh(f"rm -f {keys}")
+        kept = sh("docker", "exec", sensor, "test", "-s", keys).returncode == 0
+        check("write refused (a file the account owns stays)", denied(r) and kept, r.stderr)
         r = ssh("cat /var/log/suricata/eve.json")
         check("unbounded EVE dump refused", denied(r), r.stderr)
-        # no-pty refuses the terminal; the forced command then sees an empty command and runs nothing
         r = sh("docker", "exec", "-i", "-u", "analyst", client, "ssh", "-tt", "lab-sensor", stdin=b"id\nexit\n")
-        check("interactive login gets no shell", r.returncode != 0 and b"uid=" not in r.stdout + r.stderr,
-              f"rc={r.returncode} ".encode() + r.stdout + r.stderr)
+        check("terminal refused (no-pty)", r.returncode != 0 and b"PTY allocation request failed" in r.stderr
+              and b"uid=" not in r.stdout + r.stderr, f"rc={r.returncode} ".encode() + r.stdout + r.stderr)
+        r = sh("docker", "exec", "-u", "analyst", client, "ssh", "lab-sensor", stdin=b"id\n")
+        check("login without a command refused", denied(r) and b"interactive session" in r.stderr
+              and b"uid=" not in r.stdout, r.stdout + r.stderr)
         r = sh("docker", "exec", "-u", "analyst", client, "ssh", "-W", "sensor:22", "lab-sensor")
-        check("stdio forwarding refused (no-port-forwarding)", r.returncode != 0 and b"SSH-" not in r.stdout,
-              r.stdout + r.stderr)
+        check("stdio forwarding refused (no-port-forwarding)", r.returncode != 0
+              and b"administratively prohibited" in r.stderr, r.stdout + r.stderr)
         script = (ROOT / "tools" / "sensor_snapshot.py").read_bytes()
         r = ssh(f"python3 -I - {SNAP_ARGS}", stdin=script + b"\nimport os\n")
         check("modified snapshot script refused", denied(r) and b"allowlist" in r.stderr, r.stderr)

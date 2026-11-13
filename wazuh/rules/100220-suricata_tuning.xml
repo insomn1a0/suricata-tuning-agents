@@ -25,7 +25,6 @@
   <rule id="100226" level="7">
     <if_sid>100207</if_sid>
     <field name="alert.signature_id" type="pcre2">^9900003$</field>
-    <field name="proto" type="pcre2">^TCP$</field>
     <description>Cleartext HTTP Basic credentials from $(src_ip) to $(dest_ip): reset them if real, the server must require HTTPS</description>
     <group>suricata,tuning,http_basic_cleartext_raise,</group>
   </rule>
@@ -39,7 +38,6 @@
   <rule id="100225" level="8">
     <if_sid>100204</if_sid>
     <field name="alert.signature_id" type="pcre2">^9900002$</field>
-    <field name="proto" type="pcre2">^TCP$</field>
     <description>Remote-admin tool relay from $(src_ip) to $(dest_ip): resolve the DHCP lease holder, check the approved-tools list, and whether sessions run outside working hours</description>
     <group>suricata,tuning,remote_admin_relay_context,</group>
   </rule>

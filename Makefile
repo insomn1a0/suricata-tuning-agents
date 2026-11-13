@@ -69,12 +69,15 @@ test-pcap:
 test-e2e:
 	$(PY) tools/corpus_test.py
 
-# A mutant is a plausible but wrong intent; the corpus must catch it (exit 1). Exit 2 = not run = failure.
+# A mutant is a plausible but wrong intent; the corpus must catch it (exit 1) BY LOSING AN ATTACK - a failed
+# count or noise check alone would also kill a correct intent. Exit 2 = not run = failure.
 RULESET ?= standins
 test-e2e-mutant:
 	@for m in tests/corpus/mutants/*.yaml; do \
-	  $(PY) tools/corpus_test.py --ruleset $(RULESET) --extra-intent $$m > /dev/null; rc=$$?; \
-	  if [ $$rc -eq 1 ]; then echo "mutant killed: $$m"; \
+	  out=$$($(PY) tools/corpus_test.py --ruleset $(RULESET) --extra-intent $$m 2>&1); rc=$$?; \
+	  lost=$$(echo "$$out" | sed -n 's|^attacks visible \([0-9]*\)/\([0-9]*\).*|\1 \2|p' | awk '{print ($$1 < $$2)}'); \
+	  if [ $$rc -eq 1 ] && [ "$$lost" = 1 ]; then echo "mutant killed: $$m"; \
+	  elif [ $$rc -eq 1 ]; then echo "MUTANT NOT KILLED BY AN ATTACK: $$m - failed for another reason"; exit 1; \
 	  elif [ $$rc -eq 0 ]; then echo "MUTANT SURVIVED: $$m - the corpus does not cover this mistake"; exit 1; \
 	  else echo "NOT_RUN: $$m (exit $$rc)"; exit 1; fi; done
 

@@ -7,3 +7,11 @@ expect:
     match: {alert.signature_id: 9900001, src_ip: 10.10.100.26}
     visible: false
     rule: 100224
+  - name: beacon under the ad/tracking suffix - tunnel signature still visible after the ad lowering
+    match: {alert.signature_id: 9190002, src_ip: 10.10.100.27}
+    visible: true
+    attack: T1071.004
+  - name: the same beacon's ad/tracking lookups are lowered (regression guard, not detection)
+    match: {alert.signature_id: 9900001, src_ip: 10.10.100.27}
+    visible: false
+    rule: 100224

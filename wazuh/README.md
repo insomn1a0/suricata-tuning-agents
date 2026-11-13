@@ -30,3 +30,10 @@ Analyst-visible level in this kit: 6 (`WAZUH_ALERT_LEVEL`).
 Held: 100208-100219 (ladder extensions).
 Retired: none. Never reuse a retired ID.
 `tools/sensor_snapshot.py::predicted()` mirrors 100200-100207 - change both together.
+
+Moving alerts onto the ladder changes their `rule.id`, description and groups (`suricata,custom` instead of the
+stock `ids,suricata`): saved searches on `rule.id:86601` or `rule.groups:ids` miss them - search `rule.groups:suricata`.
+Stock siblings of the ladder: Wazuh's threat-intel rules 99915-99918 (level 9, children of 86601) still win over
+any ladder or tuning rule below level 9 when an address or domain is on their list.
+Metadata arrays: the engine matches a value anywhere in the array (`confidence: [Medium, High]` lands on 100206);
+the rule model and the snapshot read the first value - the engine side is the more visible one.

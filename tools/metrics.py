@@ -52,9 +52,11 @@ def ts(event):
 
 
 def classify(events, intents, alert_level):
-    """Per event: (visible before tuning, visible after, rule after). A disabled SID never reaches the SIEM."""
+    """Per event: (visible before tuning, visible after, rule after). Disabled SIDs and suppressed contexts never
+    reach the SIEM."""
     rules, rows, last = render.ladder(), render.wazuh_rules(intents), {}
     disabled = {sid for i in intents if i["action"] == "disable" for sid in i["sids"]}
+    suppressed = [(i, r) for i in intents if i["action"] == "suppress" for r in i["routes"]]
     out = []
     for e in sorted(events, key=ts):
         meta = {k: v[0] for k, v in e["alert"].get("metadata", {}).items() if isinstance(v, list) and v}
@@ -63,6 +65,9 @@ def classify(events, intents, alert_level):
         sid, ctx = e["alert"]["signature_id"], ctx_of(e)
         if sid in disabled:
             out.append((e, before, False, "disabled"))
+            continue
+        if any(sid in i["sids"] and render.route_matches(r, ctx) for i, r in suppressed):
+            out.append((e, before, False, "suppressed"))
             continue
         hits = [(i, rid, n) for n, (i, route, rid) in enumerate(rows)
                 if str(i["wazuh"]["parent"]) == parent and sid in i["sids"] and render.route_matches(route, ctx)]

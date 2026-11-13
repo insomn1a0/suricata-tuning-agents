@@ -102,6 +102,15 @@ class Registry(unittest.TestCase):
     def test_repo_intents_load(self):
         self.assertEqual(len(self.load_with()), len(list(render.INTENTS.glob("*.yaml"))))
 
+    def test_whole_sid_only_for_raise_and_enrich(self):
+        # review: `routes: [{proto: TCP}]` stood in for "every event" and generated a false "other protocol" negative
+        raise_ = render.whole_sid(intent(id="lab-raise", action="raise", level=7, routes=None))
+        self.assertEqual(raise_["routes"], [{}])
+        self.assertEqual(render.check_semantics(raise_, 6, RULES), [])
+        self.assertFalse([n for n, _, _ in render.test_cases(raise_) if "other protocol" in n])
+        lower = render.whole_sid(intent(routes=None))
+        self.assertIn("action lower needs 'routes'", render.check_semantics(lower, 6, RULES))
+
     def test_ids_and_overlaps(self):
         for bad, why in ((dict(wazuh={"parent": 100206, "rule_ids": [100250]}), "not in the registry"),
                          (dict(wazuh={"parent": 100206, "rule_ids": [100206]}), "ladder or reserved"),

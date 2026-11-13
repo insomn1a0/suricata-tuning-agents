@@ -16,6 +16,7 @@ import kitconfig
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 STOCK_PARENTS = {"86600", "86601"}
 STOCK_LEVELS = {"86601": 3}  # stock "Suricata: Alert" - a ladder leaf at this level hides nothing it did not
+# (if a deployment overrides 86601's level, change it here too)
 IPV4 = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
 
 
@@ -70,8 +71,11 @@ def lint(paths, id_range, alert_level=None):
         level = int(r.get("level", "0"))
         # a ladder leaf (severity + confidence only, at the stock parent's level) splits a hidden bucket, lowers nothing
         parent = (r.findtext("if_sid") or "").strip()
-        ladder_leaf = level == STOCK_LEVELS.get(parent) and \
-            set(fields) == {"alert.metadata.signature_severity", "alert.metadata.confidence"}
+        ladder_leaf = (level == STOCK_LEVELS.get(parent) and set(r.attrib) == {"id", "level"}
+                       and sorted(c.tag for c in r) == ["description", "field", "field", "group", "if_sid"]
+                       and set(fields) == {"alert.metadata.signature_severity", "alert.metadata.confidence"}
+                       and all(not f.attrib.keys() - {"name"} and re.fullmatch(r"[A-Za-z]+", f.text or "")
+                               for f in fields.values()))
         tuning = (level < alert_level and not ladder_leaf) or r.get("ignore") or r.get("frequency")
         if tuning:  # also under a stock parent: an unpinned low-level child of 86601 hides everything
             sid = fields.get("alert.signature_id")

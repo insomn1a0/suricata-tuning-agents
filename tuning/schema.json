@@ -88,7 +88,7 @@
     "routes": {
       "type": "array",
       "minItems": 1,
-      "description": "Union of exact contexts. Each route is matched as a whole; lists inside one route are an explicit product.",
+      "description": "Union of exact contexts. Each route is matched as a whole; lists inside one route are an explicit product. Omitted: raise/enrich apply to every event of the SID; lower/suppress always need routes.",
       "items": {
         "type": "object",
         "additionalProperties": false,

@@ -41,6 +41,7 @@ ROUTE_FIELDS = (("src", "src_ip"), ("dst", "dest_ip"), ("src_port", "src_port"),
                 ("proto", "proto"))
 DEFAULT_EVENT = {"src": "10.10.100.21", "dst": "10.10.0.99", "src_port": 50000, "dst_port": 445, "proto": "TCP"}
 SIEM_ACTIONS = {"lower", "enrich", "raise"}
+WHOLE_SID_ACTIONS = {"enrich", "raise"}  # may omit routes: they only add visibility, so "everywhere" is safe
 MAX_ADDRESSES = 8  # per field and route; a wider context is a different decision, not a longer list
 
 
@@ -310,6 +311,13 @@ def rule_sources(cfg):
     return sources
 
 
+def whole_sid(intent):
+    """raise/enrich without routes: every event of the SID - one route that matches anything, one rule pinned by SID."""
+    if intent["action"] in WHOLE_SID_ACTIONS and "routes" not in intent:
+        intent["routes"] = [{}]
+    return intent
+
+
 def load_intents(directory=INTENTS, alert_level=None, id_range=None):
     cfg = kitconfig.load()
     alert_level = alert_level if alert_level is not None else int(cfg["WAZUH_ALERT_LEVEL"])
@@ -320,6 +328,7 @@ def load_intents(directory=INTENTS, alert_level=None, id_range=None):
         intent = yaml.safe_load(path.read_text())
         problems = validate(intent, schema)
         if not problems:
+            whole_sid(intent)
             problems = check_semantics(intent, alert_level, rules)
             if intent["id"] != path.stem:
                 problems.append(f"id '{intent['id']}' must equal the file name")
@@ -448,6 +457,8 @@ def wazuh5_rules(intents):
         for sid in intent["sids"]:
             by_sid.setdefault((sid, str(intent["wazuh"]["parent"])), []).append((intent, route, rid))
     for (sid, parent), rows in sorted(by_sid.items()):
+        if any(not route for _, route, _ in rows):
+            continue  # a whole-SID raise/enrich leaves no "outside the tuned contexts" to replace
         tuned = {f"tuned_{n}": dict({WCS_SID: sid}, **wcs_selection(route)) for n, (_, route, _) in enumerate(rows, 1)}
         detection = dict({"selection": {WCS_SID: sid}}, **tuned, condition="selection and not 1 of tuned_*")
         rules[f"sid-{sid}-default.yml"] = wazuh5_rule(

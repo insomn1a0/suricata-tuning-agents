@@ -21,7 +21,7 @@
     {
       "techniqueID": "T1071.004",
       "score": 2,
-      "comment": "corpus dns-tunnel: DNS tunnelling-like queries through the internal resolver; detection in the corpus by a lab stand-in - depends on your ruleset",
+      "comment": "corpus dns-tunnel: DNS tunnelling-like queries through the internal resolver; corpus dns-tunnel: beacon under the ad/tracking suffix - tunnel signature still visible after the ad lowering; detection in the corpus by a lab stand-in - depends on your ruleset",
       "enabled": true
     },
     {

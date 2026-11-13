@@ -1,4 +1,5 @@
 # A remote-admin relay from a DHCP workstation: actionable, but the alert does not say what to check.
+# No routes: every event of the SID, from any host.
 id: remote-admin-relay-context
 card: examples/cards/9900002.md
 status: approved
@@ -6,8 +7,6 @@ action: enrich
 sids: [9900002]
 signature: EXAMPLE TLS SNI of Remote Administration Tool Relay
 metadata: {signature_severity: Major, confidence: Medium}
-routes:
-  - proto: TCP              # TLS: every event of the SID, from any host
 level: 8
 description: >-
   Remote-admin tool relay from $(src_ip) to $(dest_ip): resolve the DHCP lease holder, check the approved-tools

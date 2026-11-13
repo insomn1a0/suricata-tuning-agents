@@ -2,4 +2,3 @@
 1 100225 8 yes  # route 1: enrich SID 9900002
 2 100204 8 yes  # SID 99000020 extends 9900002 (anchoring)
 3 100204 8 yes  # SID 19900002 extends 9900002 (anchoring)
-4 100204 8 yes  # route 1: other protocol

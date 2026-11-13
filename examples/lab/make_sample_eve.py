@@ -23,7 +23,7 @@ SIGS = {
               "Minor", "Medium", "http"),
     # ships with Suricata (stream-events.rules), no metadata: TCP retransmissions and capture loss
     2210020: ("SURICATA STREAM ESTABLISHED packet out of window", "Generic Protocol Command Decode", None, None,
-              "tcp"),
+              "tls"),
     9100001: ("LOCAL Possible DCSync - DRSUAPI DRSGetNCChanges from non-DC", "Credential Theft",
               "Critical", "High", "dcerpc"),
 }

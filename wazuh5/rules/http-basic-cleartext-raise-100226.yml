@@ -20,7 +20,6 @@ logsource:
 detection:
   selection:
     rule.id: 9900003
-    network.transport: tcp
   condition: selection
 tags:
 - tuning

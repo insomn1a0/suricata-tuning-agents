@@ -44,6 +44,12 @@ class Model(unittest.TestCase):
         got = [(before, after, rule) for _, before, after, rule in metrics.classify(events, self.intents + [off], 6)]
         self.assertEqual(got, [(True, False, "disabled")])
 
+    def test_suppressed_context_is_never_visible(self):
+        sup = {"id": "lab-sup", "action": "suppress", "sids": [2025701], "routes": [{"src": "10.10.100.77"}]}
+        events = [ev("14:00", "10.10.30.40", src="10.10.100.77"), ev("14:00", "10.10.30.40", src="10.10.100.78")]
+        got = [(after, rule) for _, _, after, rule in metrics.classify(events, self.intents + [sup], 6)]
+        self.assertEqual(got, [(False, "suppressed"), (True, "100206")])
+
     def test_readme_block_is_current(self):
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(metrics.main(["--check"]), 0, "run `make metrics`")

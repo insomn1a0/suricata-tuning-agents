@@ -56,12 +56,17 @@ class LintTest(unittest.TestCase):
         import pathlib
         leaf = ('<rule id="{id}" level="{level}"><if_sid>86601</if_sid>'
                 '<field name="alert.metadata.signature_severity">Minor</field>{extra}'
-                '<description>x</description></rule>')
+                '<description>x</description><group>suricata,</group></rule>')
         conf = '<field name="alert.metadata.confidence">Medium</field>'
         for rule, flagged in ((dict(id=100250, level=3, extra=conf), False),
                               (dict(id=100251, level=2, extra=conf), True),     # below the stock level
                               (dict(id=100252, level=3, extra=""), True),       # wider than one bucket
-                              (dict(id=100253, level=3, extra=conf + '<field name="dest_ip">x</field>'), True)):
+                              (dict(id=100253, level=3, extra=conf + '<field name="dest_ip">x</field>'), True),
+                              # review: a catch-all value or an extra element turns a leaf into a hiding rule
+                              (dict(id=100254, level=3, extra='<field name="alert.metadata.confidence">.</field>'),
+                               True),
+                              (dict(id=100255, level=3, extra=conf + "<options>no_log</options>"), True),
+                              (dict(id=100256, level=3, extra=conf.replace("<field ", '<field type="pcre2" ')), True)):
             p = pathlib.Path(tempfile.mkdtemp()) / "ladder.xml"
             p.write_text(f'<group name="x,">{leaf.format(**rule)}</group>')
             _, findings = lint.lint([str(p)], (100200, 100299))
