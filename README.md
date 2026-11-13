@@ -52,7 +52,7 @@ Demo week, analyst-visible level >= 6 (2 intents; rule model verified by the gen
 |---|---|---|---|---|
 | 2025701 | ET INFO SMB2 NT Create AndX Request For an Executable File | 213.9 | 213.9 | 3.6 |
 | 9900001 | EXAMPLE DNS Query to Advertising/Tracking Domain | 120.0 | 120.0 | 120.0 |
-| 2025709 | ET INFO SMB2 NT Create AndX Request For a DLL File | 28.6 | 28.6 | 28.6 |
+| 2025709 | ET INFO SMB2 NT Create AndX Request For a DLL File - Possible Lateral Movement | 28.6 | 28.6 | 28.6 |
 | 9900002 | EXAMPLE TLS SNI of Remote Administration Tool Relay | 5.0 | 5.0 | 5.0 |
 | 9900003 | EXAMPLE HTTP Basic Authorization over Cleartext | 50.0 | 0.0 | 0.0 |
 | **all** | | **417.4** | **367.4** | **157.1** (-57%) |

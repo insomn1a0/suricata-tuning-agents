@@ -301,9 +301,10 @@ def check_rule_metadata(intents, known):
 
 
 def rule_sources(cfg):
-    """Rule files to check intents against: the repo's local rules and corpus stand-ins, plus an optional local
-    cache of the sensor's rule lines (SURICATA_RULES_CACHE, git-ignored - rule text, not telemetry)."""
-    sources = [ROOT / "suricata" / "rules", ROOT / "tests" / "corpus" / "lab-standins.rules"]
+    """Rule files to check intents against: the repo's local rules, corpus stand-ins and demo signatures, plus an
+    optional local cache of the sensor's rule lines (SURICATA_RULES_CACHE, git-ignored - rule text, not telemetry)."""
+    sources = [ROOT / "suricata" / "rules", ROOT / "tests" / "corpus" / "lab-standins.rules",
+               ROOT / "examples" / "lab" / "demo.rules"]
     if cfg.get("SURICATA_RULES_CACHE"):
         sources.append(pathlib.Path(cfg["SURICATA_RULES_CACHE"]).expanduser())
     return sources

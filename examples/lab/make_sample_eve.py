@@ -1,6 +1,6 @@
 """Generate two weeks of synthetic Suricata EVE alerts for the demo (deterministic, lab addresses).
 Usage: make_sample_eve.py <out-dir>   -> <out-dir>/week1/eve.json, <out-dir>/week2/eve.json
-SIDs 99000xx are fictional examples; 2025701/2025709 mimic well-known ET INFO SMB signatures;
+SIDs 99000xx are fictional (rule text: examples/lab/demo.rules); 2025701/2025709 are ET INFO SMB signatures;
 9100001 is the local DCSync signature from suricata/rules/local.rules."""
 import datetime
 import json
@@ -13,7 +13,8 @@ CLIENTS = [f"10.10.100.{i}" for i in range(20, 80)]
 SIGS = {
     2025701: ("ET INFO SMB2 NT Create AndX Request For an Executable File", "Potentially Bad Traffic",
               "Minor", "High", "smb"),
-    2025709: ("ET INFO SMB2 NT Create AndX Request For a DLL File", "Potentially Bad Traffic", "Minor", "High", "smb"),
+    2025709: ("ET INFO SMB2 NT Create AndX Request For a DLL File - Possible Lateral Movement",
+              "Potentially Bad Traffic", "Minor", "High", "smb"),
     9900001: ("EXAMPLE DNS Query to Advertising/Tracking Domain", "Misc activity", "Minor", "High", "dns"),
     9900002: ("EXAMPLE TLS SNI of Remote Administration Tool Relay", "Potentially Bad Traffic",
               "Major", "Medium", "tls"),
