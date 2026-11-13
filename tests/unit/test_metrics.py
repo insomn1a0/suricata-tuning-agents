@@ -37,6 +37,13 @@ class Model(unittest.TestCase):
                                ("10:30", "10.10.0.10", True, True, "100221"),
                                ("14:00", "10.10.30.40", True, True, "100206")])
 
+    def test_disabled_sid_is_never_visible(self):
+        # a visible SID turned off on the sensor must not keep counting as visible after tuning
+        off = {"id": "lab-off", "action": "disable", "sids": [2025709]}
+        events = [ev("09:00", "10.10.20.30", sid=2025709)]
+        got = [(before, after, rule) for _, before, after, rule in metrics.classify(events, self.intents + [off], 6)]
+        self.assertEqual(got, [(True, False, "disabled")])
+
     def test_readme_block_is_current(self):
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(metrics.main(["--check"]), 0, "run `make metrics`")

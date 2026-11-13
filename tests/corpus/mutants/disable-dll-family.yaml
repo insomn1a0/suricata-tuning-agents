@@ -1,0 +1,12 @@
+# A plausible but wrong Suricata-side decision: "the DLL signature is 100% print-driver noise in our snapshot -
+# turn it off". Volume-only reasoning: DISABLE is for signatures with no value in any context, and a DLL dropped
+# on another workstation's admin share is lateral tool transfer (T1570). Not even the archives keep it.
+id: disable-dll-family
+card: examples/cards/2025709.md
+status: approved
+action: disable
+sids: [2025709]
+signature: ET INFO SMB2 NT Create AndX Request For a DLL File - Possible Lateral Movement
+rationale: Every 2025709 alert in the snapshot went to the print server.
+risk: SMB DLL transfers are no longer detected anywhere.
+compensating_control: EDR on workstations

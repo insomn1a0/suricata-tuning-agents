@@ -19,6 +19,11 @@ Analyst-visible level in this kit: 6 (`WAZUH_ALERT_LEVEL`).
 | 100220 | 3 | 100206 | 2025701 on software distribution share (LOWER) | intent smb-exe-distribution-share, smb-tuning |
 | 100221 | 6, ignore 3600 | 100206 | 2025701 on dc1 (ENRICH, rate-limited) | intent smb-exe-domain-controllers, smb-tuning |
 | 100222 | 6, ignore 3600 | 100206 | 2025701 on dc2 (ENRICH, rate-limited) | intent smb-exe-domain-controllers |
+| 100223 | 3 | 100206 | 2025709 on print01 print$ (LOWER) | intent smb-dll-print-drivers |
+| 100224 | 3 | 100206 | 9900001 via the internal resolver (LOWER, demo) | intent dns-adtrack-resolver |
+| 100225 | 8 | 100204 | 9900002 with what to check (ENRICH, demo) | intent remote-admin-relay-context |
+| 100226 | 7 | 100207 | 9900003 cleartext credentials (RAISE, demo) | intent http-basic-cleartext-raise |
+| 100227 | 3 | 100206 | corpus mutant only - never deployed | tests/corpus/mutants/lower-dll-second-print-server.yaml |
 | 100228 | 3 | 100204 | corpus mutant only - never deployed | tests/corpus/mutants/lower-internal-resolver.yaml |
 | 100229 | 3 | 100206 | corpus mutant only - never deployed | tests/corpus/mutants/lower-admin-workstation.yaml |
 

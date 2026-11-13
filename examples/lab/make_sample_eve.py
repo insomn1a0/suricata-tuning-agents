@@ -21,20 +21,24 @@ SIGS = {
               "Major", "Medium", "tls"),
     9900003: ("EXAMPLE HTTP Basic Authorization over Cleartext", "Potential Corporate Privacy Violation",
               "Minor", "Medium", "http"),
+    # ships with Suricata (stream-events.rules), no metadata: TCP retransmissions and capture loss
+    2210020: ("SURICATA STREAM ESTABLISHED packet out of window", "Generic Protocol Command Decode", None, None,
+              "tcp"),
     9100001: ("LOCAL Possible DCSync - DRSUAPI DRSGetNCChanges from non-DC", "Credential Theft",
               "Critical", "High", "dcerpc"),
 }
+REVS = {2025701: 2, 2025709: 2, 2210020: 3}  # as in the real rule text (ET Open, Suricata stream-events.rules)
 
 
 def event(t, flow, src, dst, dport, sid):
     sig, cat, sev, conf, proto = SIGS[sid]
-    meta = {"signature_severity": [sev], "confidence": [conf]}
+    meta = {"signature_severity": [sev], "confidence": [conf]} if sev else {}
     if sid == 9100001:
         meta["mitre_technique_id"] = ["T1003.006"]
     return {"timestamp": t.strftime("%Y-%m-%dT%H:%M:%S.%f") + t.strftime("%z"), "flow_id": flow,
             "in_iface": "eth1", "event_type": "alert", "src_ip": src, "src_port": 49152 + flow % 16000,
             "dest_ip": dst, "dest_port": dport, "proto": "UDP" if proto == "dns" else "TCP", "app_proto": proto,
-            "alert": {"action": "allowed", "gid": 1, "signature_id": sid, "rev": 1, "signature": sig,
+            "alert": {"action": "allowed", "gid": 1, "signature_id": sid, "rev": REVS.get(sid, 1), "signature": sig,
                       "category": cat, "severity": 1 if sev == "Critical" else 2 if sev == "Major" else 3,
                       "metadata": meta}}
 
@@ -57,6 +61,8 @@ def week(rng, start, second):
             (120, 9900001, lambda: rng.choice(CLIENTS), "10.10.0.53", 53, (0, 24)),
             (40 if second else 5, 9900002, lambda: "10.10.100.40", "203.0.113.50", 443, (0, 24)),
             (0 if second else 50, 9900003, lambda: rng.choice(CLIENTS[:10]), "10.10.20.40", 80, (8, 18)),
+            (600 if workday else 150, 2210020, lambda: rng.choice(CLIENTS),
+             lambda: rng.choice(["10.10.20.15", "10.10.0.10", "10.10.20.30", "198.51.100.20"]), 443, (0, 24)),
         ]
         if d == 2:  # admin share copy on a workstation, a handful of events
             plan.append((3, 2025701, lambda: "10.10.100.77", "10.10.30.40", 445, (14, 15)))

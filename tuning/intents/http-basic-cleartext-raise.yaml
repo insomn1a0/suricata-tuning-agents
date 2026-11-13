@@ -1,0 +1,22 @@
+# Cleartext credentials on the internal network were hidden at level 3. The owner moved the app to HTTPS on
+# 2026-01-12 (which explains why the SID disappeared); a regression must be seen, not archived.
+id: http-basic-cleartext-raise
+card: examples/cards/9900003.md
+status: approved
+action: raise
+sids: [9900003]
+signature: EXAMPLE HTTP Basic Authorization over Cleartext
+metadata: {signature_severity: Minor, confidence: Medium}
+routes:
+  - proto: TCP              # HTTP: every event of the SID, to any internal host
+level: 7
+description: >-
+  Cleartext HTTP Basic credentials from $(src_ip) to $(dest_ip): reset them if real, the server must require HTTPS
+rationale: >-
+  The credentials are readable by anyone on the path; the analyst has a clear action. Hidden by the ladder only
+  because the rule's confidence is Medium.
+risk: None added - raises visibility.
+compensating_control: Not needed for a raise; the server owner enforces HTTPS.
+wazuh:
+  parent: 100207
+  rule_ids: [100226]

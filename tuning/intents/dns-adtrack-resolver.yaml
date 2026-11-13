@@ -1,0 +1,29 @@
+# Every workstation's ad/tracking lookups reach the sensor as queries to the internal resolver. Policy says they
+# are not a concern; the resolver blocks the suffix (RPZ) and keeps a query log.
+id: dns-adtrack-resolver
+card: examples/cards/9900001.md
+status: approved
+action: lower
+sids: [9900001]
+signature: EXAMPLE DNS Query to Advertising/Tracking Domain
+metadata: {signature_severity: Minor, confidence: High}
+routes:
+  - dst: 10.10.0.53         # dns1, internal resolver
+    dst_port: 53
+level: 3
+description: Ad/tracking DNS query via the internal resolver $(dest_ip) from $(src_ip) - blocked by RPZ
+rationale: >-
+  The analyst action is "nothing" (owner: policy, not security; RPZ blocks it). Same route as the
+  lower-internal-resolver mutant, opposite decision: the question is what the analyst does, not where the event
+  goes. A client querying an external resolver directly stays visible.
+risk: A host beaconing through the ad/tracking suffix hides among normal lookups. The events stay in archives.
+compensating_control: RPZ on dns1 for the suffix; resolver query log kept 30 days.
+wazuh:
+  parent: 100206
+  rule_ids: [100224]
+tests:
+  neighbour_sids: [2025701]
+  extra:
+    - note: a client asking an external resolver directly stays visible
+      dst: 198.51.100.53
+      dst_port: 53

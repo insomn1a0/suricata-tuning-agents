@@ -1,0 +1,22 @@
+# A remote-admin relay from a DHCP workstation: actionable, but the alert does not say what to check.
+id: remote-admin-relay-context
+card: examples/cards/9900002.md
+status: approved
+action: enrich
+sids: [9900002]
+signature: EXAMPLE TLS SNI of Remote Administration Tool Relay
+metadata: {signature_severity: Major, confidence: Medium}
+routes:
+  - proto: TCP              # TLS: every event of the SID, from any host
+level: 8
+description: >-
+  Remote-admin tool relay from $(src_ip) to $(dest_ip): resolve the DHCP lease holder, check the approved-tools
+  list, and whether sessions run outside working hours
+rationale: >-
+  Level and visibility unchanged; the value is the description. No `ignore` - it is global for the rule and would
+  hide a second host starting to use the relay.
+risk: None added - every event stays visible at the same level.
+compensating_control: EDR software inventory on workstations; proxy logs for the relay.
+wazuh:
+  parent: 100204
+  rule_ids: [100225]

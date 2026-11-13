@@ -2,6 +2,64 @@
 <group name="suricata,tuning,">
 
   <!--
+    dns-adtrack-resolver (LOWER) - card: examples/cards/9900001.md
+    Why: The analyst action is "nothing" (owner: policy, not security; RPZ blocks it). Same route as the lower-internal-resolver mutant, opposite decision: the question is what the analyst does, not where the event goes. A client querying an external resolver directly stays visible.
+    Risk: A host beaconing through the ad/tracking suffix hides among normal lookups. The events stay in archives.
+    Compensating control: RPZ on dns1 for the suffix; resolver query log kept 30 days.
+  -->
+  <rule id="100224" level="3">
+    <if_sid>100206</if_sid>
+    <field name="alert.signature_id" type="pcre2">^9900001$</field>
+    <field name="dest_ip" type="pcre2">^10\.10\.0\.53$</field>
+    <field name="dest_port" type="pcre2">^53$</field>
+    <description>Ad/tracking DNS query via the internal resolver $(dest_ip) from $(src_ip) - blocked by RPZ</description>
+    <group>suricata,tuning,dns_adtrack_resolver,</group>
+  </rule>
+
+  <!--
+    http-basic-cleartext-raise (RAISE) - card: examples/cards/9900003.md
+    Why: The credentials are readable by anyone on the path; the analyst has a clear action. Hidden by the ladder only because the rule's confidence is Medium.
+    Risk: None added - raises visibility.
+    Compensating control: Not needed for a raise; the server owner enforces HTTPS.
+  -->
+  <rule id="100226" level="7">
+    <if_sid>100207</if_sid>
+    <field name="alert.signature_id" type="pcre2">^9900003$</field>
+    <field name="proto" type="pcre2">^TCP$</field>
+    <description>Cleartext HTTP Basic credentials from $(src_ip) to $(dest_ip): reset them if real, the server must require HTTPS</description>
+    <group>suricata,tuning,http_basic_cleartext_raise,</group>
+  </rule>
+
+  <!--
+    remote-admin-relay-context (ENRICH) - card: examples/cards/9900002.md
+    Why: Level and visibility unchanged; the value is the description. No `ignore` - it is global for the rule and would hide a second host starting to use the relay.
+    Risk: None added - every event stays visible at the same level.
+    Compensating control: EDR software inventory on workstations; proxy logs for the relay.
+  -->
+  <rule id="100225" level="8">
+    <if_sid>100204</if_sid>
+    <field name="alert.signature_id" type="pcre2">^9900002$</field>
+    <field name="proto" type="pcre2">^TCP$</field>
+    <description>Remote-admin tool relay from $(src_ip) to $(dest_ip): resolve the DHCP lease holder, check the approved-tools list, and whether sessions run outside working hours</description>
+    <group>suricata,tuning,remote_admin_relay_context,</group>
+  </rule>
+
+  <!--
+    smb-dll-print-drivers (LOWER) - card: examples/cards/2025709.md
+    Why: 100% of the SID's volume is workstations reading driver DLLs from print$; the analyst action is "nothing". A DLL to any other host - a workstation's admin share above all - stays visible.
+    Risk: A malicious driver planted on print$ and pulled by clients looks identical. The event stays in archives.
+    Compensating control: FIM on print$ (Windows 4663/5145 on print01), owner-confirmed.
+  -->
+  <rule id="100223" level="3">
+    <if_sid>100206</if_sid>
+    <field name="alert.signature_id" type="pcre2">^2025709$</field>
+    <field name="dest_ip" type="pcre2">^10\.10\.20\.30$</field>
+    <field name="dest_port" type="pcre2">^445$</field>
+    <description>SMB DLL open on print server $(dest_ip) from $(src_ip) - printer driver share</description>
+    <group>suricata,tuning,smb_dll_print_drivers,</group>
+  </rule>
+
+  <!--
     smb-exe-distribution-share (LOWER) - card: examples/cards/2025701.md
     Why: 90% of the SID's volume is clients reading installers from files01; the analyst action is "nothing". Other servers, admin shares, port 139 and the reverse direction stay visible.
     Risk: A malicious exe planted on the share and run by clients looks identical. The event stays in archives.

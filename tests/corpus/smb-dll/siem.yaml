@@ -1,0 +1,9 @@
+expect:
+  - name: DLL dropped on another workstation's admin share
+    match: {alert.signature_id: 2025709, src_ip: 10.10.100.77, dest_ip: 10.10.30.40}
+    visible: true
+    attack: T1570
+  - name: printer driver DLL read from print01 print$
+    match: {alert.signature_id: 2025709, dest_ip: 10.10.20.30}
+    visible: false
+    rule: 100223

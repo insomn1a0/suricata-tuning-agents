@@ -1,0 +1,21 @@
+# A plausible but wrong decision: "10.10.30.40 also serves drivers - it is the second print server, lower DLL
+# reads there too". Exact routes, owner-sounding rationale, passes every static check. But 10.10.30.40 is an
+# ordinary workstation (not in the inventory -> ASK): a DLL on its admin share is lateral tool transfer (T1570).
+id: lower-dll-second-print-server
+card: examples/cards/2025709.md
+status: approved
+action: lower
+sids: [2025709]
+signature: ET INFO SMB2 NT Create AndX Request For a DLL File - Possible Lateral Movement
+metadata: {signature_severity: Minor, confidence: High}
+routes:
+  - dst: 10.10.30.40
+    dst_port: 445
+level: 3
+description: SMB DLL open on second print server $(dest_ip) from $(src_ip)
+rationale: Driver DLLs are also served from the second print server.
+risk: DLL transfer to this host is no longer visible.
+compensating_control: FIM on print$
+wazuh:
+  parent: 100206
+  rule_ids: [100227]

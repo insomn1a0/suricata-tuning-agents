@@ -1,0 +1,29 @@
+# Clients fetch printer driver DLLs from print$ on print01 every working day; the owner confirmed print$ holds
+# drivers only, clients cannot write there, and FIM watches it.
+id: smb-dll-print-drivers
+card: examples/cards/2025709.md
+status: approved
+action: lower
+sids: [2025709]
+signature: ET INFO SMB2 NT Create AndX Request For a DLL File - Possible Lateral Movement
+metadata: {signature_severity: Minor, confidence: High}
+routes:
+  - dst: 10.10.20.30        # print01, print$ driver share (inventory: role + owner)
+    dst_port: 445
+level: 3
+description: SMB DLL open on print server $(dest_ip) from $(src_ip) - printer driver share
+rationale: >-
+  100% of the SID's volume is workstations reading driver DLLs from print$; the analyst action is "nothing".
+  A DLL to any other host - a workstation's admin share above all - stays visible.
+risk: A malicious driver planted on print$ and pulled by clients looks identical. The event stays in archives.
+compensating_control: FIM on print$ (Windows 4663/5145 on print01), owner-confirmed.
+wazuh:
+  parent: 100206
+  rule_ids: [100223]
+tests:
+  neighbour_sids: [2025701]
+  extra:
+    - note: DLL dropped on another workstation's admin share stays visible (T1570)
+      src: 10.10.100.77
+      dst: 10.10.30.40
+      dst_port: 445

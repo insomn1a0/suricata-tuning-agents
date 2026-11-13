@@ -100,7 +100,7 @@ class Registry(unittest.TestCase):
             return render.load_intents(pathlib.Path(d) / "i", 6, (100200, 100299))
 
     def test_repo_intents_load(self):
-        self.assertEqual(len(self.load_with()), 2)
+        self.assertEqual(len(self.load_with()), len(list(render.INTENTS.glob("*.yaml"))))
 
     def test_ids_and_overlaps(self):
         for bad, why in ((dict(wazuh={"parent": 100206, "rule_ids": [100250]}), "not in the registry"),
@@ -116,7 +116,8 @@ class Registry(unittest.TestCase):
         raise_ = intent(id="lab-raise", action="raise", level=12, routes=[{"src": "10.10.100.66", "dst": "10.10.20.15",
                                                                            "dst_port": 445}])
         rows = [(raise_, raise_["routes"][0], 100250)]
-        lower = render.load_intents(render.INTENTS, 6, (100200, 100299))[0]
+        lower = next(i for i in render.load_intents(render.INTENTS, 6, (100200, 100299))
+                     if i["id"] == "smb-exe-distribution-share")
         rows.append((lower, lower["routes"][0], 100220))
         self.assertTrue(render.routes_overlap(rows[0][1], rows[1][1]))
         self.assertTrue(render.check_overlaps([lower, dict(raise_, wazuh={"parent": 100206, "rule_ids": [100250]})]))
@@ -230,7 +231,7 @@ class Rendering(unittest.TestCase):
         rules5, ladder_rules = render.wazuh5_rules(intents), render.ladder()
         threshold = render.KEYWORD_ORDER.index(render.level_keyword(6))
         compared = 0
-        for intent in intents:
+        for intent in (i for i in intents if i["action"] in render.SIEM_ACTIONS):  # disable/suppress: Suricata side
             fired = set()
             for note, sid, ctx in render.test_cases(intent):
                 _, _, visible4 = render.expected(intents, ladder_rules, sid, ctx, intent["metadata"], fired, 6)

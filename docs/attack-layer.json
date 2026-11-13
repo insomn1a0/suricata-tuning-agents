@@ -27,7 +27,7 @@
     {
       "techniqueID": "T1570",
       "score": 2,
-      "comment": "corpus smb-exe: exe copied to another workstation's admin share; detection in the corpus by a lab stand-in - depends on your ruleset",
+      "comment": "corpus smb-dll: DLL dropped on another workstation's admin share; corpus smb-exe: exe copied to another workstation's admin share; detection in the corpus by a lab stand-in - depends on your ruleset",
       "enabled": true
     }
   ],
