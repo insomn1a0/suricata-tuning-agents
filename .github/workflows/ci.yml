@@ -53,6 +53,7 @@ jobs:
       - run: pip install -r requirements.txt
       - run: make test-pcap
       - run: make test-sensor-ro
+      - run: make test-sensor-ssh   # builds the sshd lab sensor (distro openssh), then --internal network only
 
   # The same corpus with the real ET Open signatures (downloaded at test time, BSD-licensed range, never
   # committed): intent metadata checked against the real rule text, attacks visible, mutants killed.

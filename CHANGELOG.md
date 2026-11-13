@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.0.0 - 2026-11-13
+
+The whole loop on the demo, with the kit's own agents. Lab-tested only (logtest, pcap-lab, sensor-lab evidence).
+
+- Every demo SID triaged by `noise-analyst` (cards in `examples/cards/`), owner answers as a demo scenario, a
+  human review on top: all six decision classes, `docs/WALKTHROUGH.md` with the real command output.
+- New intents: LOWER print drivers on print01, LOWER ad/tracking lookups via the resolver, ENRICH the remote-admin
+  relay, RAISE cleartext Basic auth, DISABLE stream out-of-window noise.
+- Ladder leaf 100207 (Minor/Medium, hidden as before): a RAISE needs a leaf parent, and the stock rule is not one -
+  the documented RAISE class could not be implemented for the typical hidden alert.
+- Corpus case `smb-dll` and DNS ad lookup next to the tunnel (same route, opposite decision); mutants
+  `lower-dll-second-print-server` and `disable-dll-family` killed.
+- `make test-sensor-ssh`: an sshd lab sensor set up with `install.sh` and the forced command; `tools/snapshot.sh`
+  over real ssh equals a local snapshot of the same files; writes, chains, dumps, a shell, forwarding refused.
+- Metrics count disabled SIDs as never visible; demo signature text for the fictional SIDs; real rule revisions
+  in the demo data (the triage agent caught the mismatch).
+- Fix: the sensor-lab test used a fixed date that fell out of the 7-day window a week after release.
+
 ## v0.1.0 - 2026-11-08
 
 First release: stages 1-5 of PLAN.md. Lab-tested only (logtest, pcap-lab, sensor-lab evidence).
