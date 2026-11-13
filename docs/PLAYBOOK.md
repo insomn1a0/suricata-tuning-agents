@@ -9,6 +9,8 @@
   `DISABLE` is for parser/decoder noise that has no value anywhere.
 - Every hiding decision names what could be missed and the compensating control (FIM on a share,
   EDR on servers, DC audit logs). If there is none, say so in the card.
+- Hidden is not watched. "Keep it so a regression shows" only works at a visible level; below it a regression is
+  archived. A SID that disappears needs an explanation (fixed, moved, or the sensor went blind) before quiet counts.
 - An address is not an identity in a DHCP range. Lowering needs a host from the inventory with a role and owner.
 - A shared resolver, proxy or NAT is not a client. Alerts "from" it are everyone's alerts.
 

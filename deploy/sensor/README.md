@@ -40,5 +40,7 @@ ssh -o BatchMode=yes suricata-ro@sensor 'id; id'
 `sensor-ro: denied - operator ';' ...` means the boundary is in place (the laptop guard allows two harmless
 reads; only the sensor-side wrapper refuses a second command). Two `id` lines mean it is not.
 
+Evidence for the whole path: `make test-sensor-ssh` builds a lab sensor exactly as above (account, ACLs,
+`install.sh`, forced command) and runs `tools/snapshot.sh` against it over ssh from a second container.
 Evidence for the wrapper: `make test-sensor-ro` - a Suricata container plays the sensor and every case runs for
 real: reads succeed, refused writes leave `suricata.yaml` unchanged, a modified snapshot script does not run.
