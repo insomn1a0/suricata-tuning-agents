@@ -1,4 +1,6 @@
-# Five long-label TXT queries via the internal resolver alert once (threshold 3 in 60 s); a normal query does not.
+# Five long-label TXT queries via the internal resolver alert once (threshold 3 in 60 s); a normal query does not;
+# an ad/tracking lookup via the same resolver alerts (demo 9900001) and is lowered; a beacon under that suffix
+# still trips the tunnel signature.
 requires:
   min-version: 8.0.0
 checks:
@@ -8,3 +10,12 @@ checks:
   - filter:
       count: 0
       match: {event_type: alert, alert.signature_id: 9190002, src_ip: 10.10.100.25}
+  - filter:
+      count: 1
+      match: {event_type: alert, alert.signature_id: 9900001, src_ip: 10.10.100.26}
+  - filter:
+      count: 1
+      match: {event_type: alert, alert.signature_id: 9190002, src_ip: 10.10.100.27}
+  - filter:
+      count: 3
+      match: {event_type: alert, alert.signature_id: 9900001, src_ip: 10.10.100.27}

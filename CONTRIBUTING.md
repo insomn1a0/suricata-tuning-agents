@@ -14,7 +14,7 @@
 ```bash
 make venv                  # PyYAML (+ `pip install -r requirements-dev.txt` for ruff)
 make lint test-unit        # static: generated files current, rule lint, lab data, links, unit tests
-make test-logtest test-pcap test-e2e test-e2e-mutant test-sensor-ro   # engines in Docker
+make test-logtest test-pcap test-e2e test-e2e-mutant test-sensor-ro test-sensor-ssh   # engines in Docker
 ruff check .
 ```
 
@@ -27,4 +27,5 @@ Optional: `pip install pre-commit && pre-commit install` runs ruff and `make lin
 - **A guard or wrapper fix**: add the failing input as a row first (`tests/unit/test_guard.py`,
   `tests/unit/test_sensor_ro.py`, `tests/sensor/run_cases.py`), then fix. A test that never failed proves nothing.
 - **A signature**: `suricata/rules/local.rules` plus a corpus case with positive and closest-negative traffic.
-- Commits: small, imperative subject; one PR per change; CI green before review.
+- Commits: small, imperative subject; one PR per change; CI green before review. The PR template asks which
+  suites ran - say where, and label the evidence.

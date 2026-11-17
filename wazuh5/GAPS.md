@@ -14,7 +14,7 @@ Rules no longer chain, so a generic Suricata severity rule still matches a lower
 
 ```yaml
 filter_tuned_sids:
-  rule.id: [2025701]
+  rule.id: [2025701, 2025709, 9900001, 9900002, 9900003]
 # condition: <existing> and not filter_tuned_sids
 ```
 

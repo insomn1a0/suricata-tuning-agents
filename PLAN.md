@@ -49,6 +49,20 @@ Status: done (v0.1.0).
 - [x] Release `v0.1.0` with the CHANGELOG as notes.
 Done when: a stranger can understand the project from the README in two minutes.
 
+## Stage 6 - The whole loop on the demo (v1.0.0)
+Status: done (local tag v1.0.0; nothing pushed until the user says so).
+The demo stopped at "snapshot -> diff" and tuned 2 of 5 SIDs, though its data already told a story (a new
+DCSync, a disappeared SID, a spike from a DHCP workstation). The loop now runs end to end with the kit's own agents.
+- [x] Sensor-lab test dated relative to now (a fixed date fell out of the 7-day window and failed the run).
+- [x] Demo signature text for the fictional SIDs (metadata checked against it, `suricata -T` clean).
+- [x] `noise-analyst` triaged every demo SID; cards in `examples/cards/` with owner answers and review notes.
+- [x] Intents, corpus cases and mutants for the new hiding decisions; `reviewer` on the batch (REJECT -> fixed:
+      DISABLE reverted, whole-SID raise/enrich, mutants must lose an attack, tighter lint and ssh checks).
+- [x] `docs/WALKTHROUGH.md` with real command output; README points to it.
+- [x] The ssh path exercised for real: `make test-sensor-ssh` (sshd lab sensor, README ACLs, `install.sh`).
+- [x] Metrics, CHANGELOG, local tag `v1.0.0`.
+Done when: a stranger can regenerate the demo and see each decision, its intent, its tests and its effect.
+
 ## Later - only if it earns its place
 - Run the Wazuh 5 output on a 5.x indexer + content-manager logtest once 5.0 is GA; confirm the WCS field paths.
 - Behavioural analytics over EVE flow/krb5/dns (Kerberoasting, password spraying, lateral fan-out) - a separate

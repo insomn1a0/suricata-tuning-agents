@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security issue (sensor wrapper, guard, renderer)
+    url: https://github.com/insomn1a0/suricata-tuning-agents/security/advisories/new
+    about: Report privately - see SECURITY.md for what is in scope.
+  - name: How the process works
+    url: https://github.com/insomn1a0/suricata-tuning-agents/blob/main/docs/WALKTHROUGH.md
+    about: The whole loop on the demo data, with the real command output for each step.

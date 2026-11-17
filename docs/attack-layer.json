@@ -21,13 +21,13 @@
     {
       "techniqueID": "T1071.004",
       "score": 2,
-      "comment": "corpus dns-tunnel: DNS tunnelling-like queries through the internal resolver; detection in the corpus by a lab stand-in - depends on your ruleset",
+      "comment": "corpus dns-tunnel: DNS tunnelling-like queries through the internal resolver; corpus dns-tunnel: beacon under the ad/tracking suffix - tunnel signature still visible after the ad lowering; detection in the corpus by a lab stand-in - depends on your ruleset",
       "enabled": true
     },
     {
       "techniqueID": "T1570",
       "score": 2,
-      "comment": "corpus smb-exe: exe copied to another workstation's admin share; detection in the corpus by a lab stand-in - depends on your ruleset",
+      "comment": "corpus smb-dll: DLL dropped on another workstation's admin share; corpus smb-exe: exe copied to another workstation's admin share; detection in the corpus by a lab stand-in - depends on your ruleset",
       "enabled": true
     }
   ],

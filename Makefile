@@ -5,7 +5,7 @@ export PY
 # Config (engine versions, alert level, ID range) is read by tools/kitconfig.py, not by make:
 # environment.env is shell syntax. Override per run: make test-logtest WAZUH_VERSION=4.14.8
 
-.PHONY: help venv render demo lint test test-unit test-logtest test-pcap test-e2e test-e2e-mutant test-et-open test-sensor-ro metrics attack-layer evals snapshot diff clean
+.PHONY: help venv render demo lint test test-unit test-logtest test-pcap test-e2e test-e2e-mutant test-et-open test-sensor-ro test-sensor-ssh metrics attack-layer evals snapshot diff clean
 
 help:
 	@echo "make venv          local virtualenv with requirements.txt (PyYAML for tuning intents)"
@@ -22,7 +22,8 @@ help:
 	@echo "make test-e2e-mutant  every bad intent in tests/corpus/mutants must make test-e2e fail"
 	@echo "make test-et-open  corpus + mutants with the real ET Open rules (downloaded, BSD range, not vendored)"
 	@echo "make test-sensor-ro   ssh ForceCommand wrapper with real execution in a Suricata container"
-	@echo "make test          all of the above"
+	@echo "make test-sensor-ssh  lab sensor over real ssh: install.sh, forced command, remote snapshot = local"
+	@echo "make test          lint, unit and every engine suite above except test-et-open (evals never)"
 	@echo "make snapshot      7-day snapshot from the sensor in config/environment.env"
 
 demo:
@@ -69,12 +70,15 @@ test-pcap:
 test-e2e:
 	$(PY) tools/corpus_test.py
 
-# A mutant is a plausible but wrong intent; the corpus must catch it (exit 1). Exit 2 = not run = failure.
+# A mutant is a plausible but wrong intent; the corpus must catch it (exit 1) BY LOSING AN ATTACK - a failed
+# count or noise check alone would also kill a correct intent. Exit 2 = not run = failure.
 RULESET ?= standins
 test-e2e-mutant:
 	@for m in tests/corpus/mutants/*.yaml; do \
-	  $(PY) tools/corpus_test.py --ruleset $(RULESET) --extra-intent $$m > /dev/null; rc=$$?; \
-	  if [ $$rc -eq 1 ]; then echo "mutant killed: $$m"; \
+	  out=$$($(PY) tools/corpus_test.py --ruleset $(RULESET) --extra-intent $$m 2>&1); rc=$$?; \
+	  lost=$$(echo "$$out" | sed -n 's|^attacks visible \([0-9]*\)/\([0-9]*\).*|\1 \2|p' | awk '{print ($$1 < $$2)}'); \
+	  if [ $$rc -eq 1 ] && [ "$$lost" = 1 ]; then echo "mutant killed: $$m"; \
+	  elif [ $$rc -eq 1 ]; then echo "MUTANT NOT KILLED BY AN ATTACK: $$m - failed for another reason"; exit 1; \
 	  elif [ $$rc -eq 0 ]; then echo "MUTANT SURVIVED: $$m - the corpus does not cover this mistake"; exit 1; \
 	  else echo "NOT_RUN: $$m (exit $$rc)"; exit 1; fi; done
 
@@ -94,7 +98,12 @@ test-sensor-ro:
 	  -v "$(CURDIR)/tests/sensor:/tests:ro" \
 	  "$$($(PY) tools/kitconfig.py | sed -n 's/^SURICATA_IMAGE=//p')" /tests/run_cases.py
 
-test: lint test-unit test-logtest test-pcap test-e2e test-e2e-mutant test-sensor-ro
+# The whole ssh path: sshd, authorized_keys forced command, install.sh, tools/snapshot.sh (evidence: sensor-lab).
+# Builds a lab image from the pinned Suricata image + distro openssh (needs network for the build only).
+test-sensor-ssh:
+	$(PY) tests/sensor/ssh_e2e.py
+
+test: lint test-unit test-logtest test-pcap test-e2e test-e2e-mutant test-sensor-ro test-sensor-ssh
 
 snapshot:
 	tools/snapshot.sh 7

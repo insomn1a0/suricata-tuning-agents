@@ -100,7 +100,19 @@ class Registry(unittest.TestCase):
             return render.load_intents(pathlib.Path(d) / "i", 6, (100200, 100299))
 
     def test_repo_intents_load(self):
-        self.assertEqual(len(self.load_with()), 2)
+        self.assertEqual(len(self.load_with()), len(list(render.INTENTS.glob("*.yaml"))))
+
+    def test_whole_sid_only_for_raise_and_enrich(self):
+        # review: `routes: [{proto: TCP}]` stood in for "every event" and generated a false "other protocol" negative
+        raise_ = render.whole_sid(intent(id="lab-raise", action="raise", level=7, routes=None))
+        self.assertEqual(raise_["routes"], [{}])
+        self.assertEqual(render.check_semantics(raise_, 6, RULES), [])
+        self.assertFalse([n for n, _, _ in render.test_cases(raise_) if "other protocol" in n])
+        windowed = render.whole_sid(intent(id="lab-enrich", action="enrich", level=6, routes=None,
+                                           rate_limit={"ignore_seconds": 3600}))
+        self.assertTrue([e for e in render.check_semantics(windowed, 6, RULES) if "src or dst" in e])
+        lower = render.whole_sid(intent(routes=None))
+        self.assertIn("action lower needs 'routes'", render.check_semantics(lower, 6, RULES))
 
     def test_ids_and_overlaps(self):
         for bad, why in ((dict(wazuh={"parent": 100206, "rule_ids": [100250]}), "not in the registry"),
@@ -116,7 +128,8 @@ class Registry(unittest.TestCase):
         raise_ = intent(id="lab-raise", action="raise", level=12, routes=[{"src": "10.10.100.66", "dst": "10.10.20.15",
                                                                            "dst_port": 445}])
         rows = [(raise_, raise_["routes"][0], 100250)]
-        lower = render.load_intents(render.INTENTS, 6, (100200, 100299))[0]
+        lower = next(i for i in render.load_intents(render.INTENTS, 6, (100200, 100299))
+                     if i["id"] == "smb-exe-distribution-share")
         rows.append((lower, lower["routes"][0], 100220))
         self.assertTrue(render.routes_overlap(rows[0][1], rows[1][1]))
         self.assertTrue(render.check_overlaps([lower, dict(raise_, wazuh={"parent": 100206, "rule_ids": [100250]})]))
@@ -133,7 +146,8 @@ class EngineModel(unittest.TestCase):
         self.assertEqual(render.ladder_select(RULES, {"signature_severity": "Minor", "confidence": "High"}), "100206")
         critical = {"signature_severity": "Critical", "confidence": "High"}
         self.assertEqual(render.ladder_select(RULES, critical), "100202")
-        self.assertEqual(render.ladder_select(RULES, {"signature_severity": "Minor", "confidence": "Medium"}), "86601")
+        self.assertEqual(render.ladder_select(RULES, {"signature_severity": "Minor", "confidence": "Medium"}), "100207")
+        self.assertEqual(render.ladder_select(RULES, {"signature_severity": "Minor", "confidence": "Low"}), "86601")
 
 
 class Rendering(unittest.TestCase):
@@ -229,7 +243,7 @@ class Rendering(unittest.TestCase):
         rules5, ladder_rules = render.wazuh5_rules(intents), render.ladder()
         threshold = render.KEYWORD_ORDER.index(render.level_keyword(6))
         compared = 0
-        for intent in intents:
+        for intent in (i for i in intents if i["action"] in render.SIEM_ACTIONS):  # disable/suppress: Suricata side
             fired = set()
             for note, sid, ctx in render.test_cases(intent):
                 _, _, visible4 = render.expected(intents, ladder_rules, sid, ctx, intent["metadata"], fired, 6)

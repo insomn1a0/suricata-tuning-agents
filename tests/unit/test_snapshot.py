@@ -28,7 +28,7 @@ class LadderTest(unittest.TestCase):
         cases = {("Critical", "High"): ("100202", 13), ("Critical", "Medium"): ("100201", 11),
                  ("Critical", "-"): ("100200", 10), ("Major", "High"): ("100205", 9),
                  ("Major", "Medium"): ("100204", 8), ("Major", "Low"): ("100203", 7),
-                 ("Minor", "High"): ("100206", 6), ("Minor", "Medium"): ("86601", 3),
+                 ("Minor", "High"): ("100206", 6), ("Minor", "Medium"): ("100207", 3),
                  ("-", "-"): ("86601", 3)}
         for (sev, conf), want in cases.items():
             self.assertEqual(snap.predicted(sev, conf), want, (sev, conf))
@@ -74,7 +74,7 @@ class BuildTest(unittest.TestCase):
         now = datetime.datetime(2026, 1, 12, tzinfo=TZ)
         doc = snap.build([str(self.tmp / "demo/week1/eve.json")], 7, now, (8, 19), tz=TZ)
         s = {x["sid"]: x for x in doc["sids"]}
-        self.assertEqual(set(s), {2025701, 2025709, 9900001, 9900002, 9900003})
+        self.assertEqual(set(s), {2025701, 2025709, 2210020, 9900001, 9900002, 9900003})
         self.assertEqual(s[9900001]["count"], 840)
         self.assertEqual(s[2025701]["top_dst"][0][0], "10.10.20.15")
         self.assertNotIn(9100001, s)

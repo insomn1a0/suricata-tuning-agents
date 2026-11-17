@@ -1,0 +1,29 @@
+name: Tuning hides an attack
+description: A decision class, an intent or a generated rule hides something the analyst should have seen
+labels: [blind-spot]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The most useful report is a corpus case or a mutant that should fail and does not
+        (`tests/corpus/`, `tests/corpus/mutants/`). Lab data only.
+  - type: input
+    id: where
+    attributes:
+      label: Intent, rule or decision class
+      placeholder: tuning/intents/smb-exe-distribution-share.yaml, rule 100220
+    validations:
+      required: true
+  - type: textarea
+    id: attack
+    attributes:
+      label: The attack that becomes invisible
+      description: Technique (ATT&CK ID if you have one), the traffic, which SID fires and why the analyst needs it.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: An event, a pcap recipe for tests/corpus/generate.py, or a logtest line.
+      render: text

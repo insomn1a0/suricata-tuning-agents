@@ -33,7 +33,8 @@ import render
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CORPUS = ROOT / "tests" / "corpus"
-RULES = [ROOT / "suricata" / "rules" / "local.rules", CORPUS / "lab-standins.rules"]
+RULES = [ROOT / "suricata" / "rules" / "local.rules", CORPUS / "lab-standins.rules",
+         ROOT / "examples" / "lab" / "demo.rules"]  # the demo's fictional SIDs, so their intents meet packets too
 ET_RULES = ROOT / "rules-cache" / "et-open" / "selected.rules"
 
 

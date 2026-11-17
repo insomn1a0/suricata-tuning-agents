@@ -52,14 +52,23 @@ def ts(event):
 
 
 def classify(events, intents, alert_level):
-    """Per event: (visible before tuning, visible after, rule after)."""
+    """Per event: (visible before tuning, visible after, rule after). Disabled SIDs and suppressed contexts never
+    reach the SIEM."""
     rules, rows, last = render.ladder(), render.wazuh_rules(intents), {}
+    disabled = {sid for i in intents if i["action"] == "disable" for sid in i["sids"]}
+    suppressed = [(i, r) for i in intents if i["action"] == "suppress" for r in i["routes"]]
     out = []
     for e in sorted(events, key=ts):
         meta = {k: v[0] for k, v in e["alert"].get("metadata", {}).items() if isinstance(v, list) and v}
         parent = render.ladder_select(rules, meta)
         before = rules[parent]["level"] >= alert_level
         sid, ctx = e["alert"]["signature_id"], ctx_of(e)
+        if sid in disabled:
+            out.append((e, before, False, "disabled"))
+            continue
+        if any(sid in i["sids"] and render.route_matches(r, ctx) for i, r in suppressed):
+            out.append((e, before, False, "suppressed"))
+            continue
         hits = [(i, rid, n) for n, (i, route, rid) in enumerate(rows)
                 if str(i["wazuh"]["parent"]) == parent and sid in i["sids"] and render.route_matches(route, ctx)]
         if not hits:
@@ -106,6 +115,10 @@ def block(corpus_result=None):
     change = (total[2] - total[1]) / total[1] * 100 if total[1] else 0
     lines += [f"| **all** | | **{total[0] / days:.1f}** | **{total[1] / days:.1f}** | **{total[2] / days:.1f}** "
               f"({change:+.0f}%) |", ""]
+    off = sorted({sid for i in intents if i["action"] == "disable" for sid in i["sids"]} & set(per_sid))
+    if off:
+        lines.append("Disabled on the sensor (no longer generated - archives and indexer load): " + ", ".join(
+            f"{sid} {per_sid[sid][0] / days:.1f}/day" for sid in off) + ".")
     lateral = [(b, a) for e, b, a, _ in rows if e["src_ip"] == "10.10.100.77" and e["dest_ip"] == "10.10.30.40"]
     lines.append(f"Lateral tool transfer in the demo data (exe to a workstation admin share): "
                  f"{sum(a for _, a in lateral)}/{len(lateral)} events still visible after tuning.")

@@ -2,6 +2,7 @@
 Every case goes through the real ForceCommand wrapper with real execution - not a dry run - and checks the
 exit code, the output and that refused commands changed nothing. Evidence label: sensor-lab.
 Layout: /opt/sensor-ro/{sensor_ro.py, guard.py, sensor_snapshot.py}."""
+import datetime
 import hashlib
 import json
 import os
@@ -19,9 +20,12 @@ def setup():
     script = open(SNAPSHOT, "rb").read()
     with open(ALLOW, "w") as f:
         f.write(f"{hashlib.sha256(script).hexdigest()}  tools/sensor_snapshot.py\n")
-    with open("/var/log/suricata/eve.json", "w") as f:  # lab telemetry for the snapshot and bounded reads
+    # lab telemetry for the snapshot and bounded reads; dated an hour ago so it stays inside the 7-day window
+    hour_ago = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)
+    ts = hour_ago.strftime("%Y-%m-%dT%H:%M:%S.%f+0000")
+    with open("/var/log/suricata/eve.json", "w") as f:
         for _ in range(20):
-            f.write(json.dumps({"timestamp": "2026-11-03T10:00:00.000000+0000", "event_type": "alert",
+            f.write(json.dumps({"timestamp": ts, "event_type": "alert",
                                 "src_ip": "10.10.100.21", "dest_ip": "10.10.20.15", "dest_port": 445,
                                 "alert": {"signature_id": 2025701, "signature": "lab", "severity": 3,
                                           "metadata": {"signature_severity": ["Minor"], "confidence": ["High"]}}})

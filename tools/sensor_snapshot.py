@@ -7,7 +7,7 @@ or locally against a file (lab / demo):
 
 Only aggregates leave the sensor: counts, distinct counts and top-5 lists. Raw events never do.
 `predicted_rule`/`predicted_level` mirror the severity x confidence ladder in
-wazuh/rules/100200-suricata_rules.xml (100200-100206). Tuning children (100220+, generated) are not
+wazuh/rules/100200-suricata_rules.xml (100200-100207). Tuning children (100220+, generated) are not
 modelled - confirm final rule IDs with a SIEM query.
 """
 import argparse
@@ -28,8 +28,8 @@ def predicted(sev, conf):
         return {"Medium": ("100201", 11), "High": ("100202", 13)}.get(conf, ("100200", 10))
     if sev == "Major":
         return {"Medium": ("100204", 8), "High": ("100205", 9)}.get(conf, ("100203", 7))
-    if sev == "Minor" and conf == "High":
-        return ("100206", 6)
+    if sev == "Minor":
+        return {"High": ("100206", 6), "Medium": ("100207", 3)}.get(conf, ("86601", 3))
     return ("86601", 3)  # stock Wazuh Suricata alert rule
 
 
