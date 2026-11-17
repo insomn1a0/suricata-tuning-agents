@@ -22,7 +22,8 @@ help:
 	@echo "make test-e2e-mutant  every bad intent in tests/corpus/mutants must make test-e2e fail"
 	@echo "make test-et-open  corpus + mutants with the real ET Open rules (downloaded, BSD range, not vendored)"
 	@echo "make test-sensor-ro   ssh ForceCommand wrapper with real execution in a Suricata container"
-	@echo "make test          all of the above"
+	@echo "make test-sensor-ssh  lab sensor over real ssh: install.sh, forced command, remote snapshot = local"
+	@echo "make test          lint, unit and every engine suite above except test-et-open (evals never)"
 	@echo "make snapshot      7-day snapshot from the sensor in config/environment.env"
 
 demo:

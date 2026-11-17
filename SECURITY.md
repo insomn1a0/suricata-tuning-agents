@@ -24,5 +24,5 @@ Use lab data only (10.10.0.0/16, documentation ranges, `*.lab.local`) - never de
 ## Status
 
 The kit has been tested in lab containers only (`logtest`, `pcap-lab`, `sensor-lab` evidence) and has not run
-against a production sensor. Review it before use; the sensor boundary has been through five adversarial review
-rounds, whose findings are test cases.
+against a production sensor. Review it before use; the sensor boundary has been through six adversarial review
+rounds, whose findings are test cases, and `make test-sensor-ssh` drives it over real ssh on a lab sensor.

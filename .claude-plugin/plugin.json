@@ -1,6 +1,6 @@
 {
   "name": "suricata-tuning",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "Evidence-first tuning of Suricata -> Wazuh alerts: triage agents, procedures and a PreToolUse guard that keeps the sensor read-only.",
   "author": {
     "name": "insomn1a0",

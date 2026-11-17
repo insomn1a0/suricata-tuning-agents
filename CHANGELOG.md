@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.0.0 - 2026-11-13
+## v1.0.0 - 2026-11-17
 
 The whole loop on the demo, with the kit's own agents. Lab-tested only (logtest, pcap-lab, sensor-lab evidence).
 
@@ -24,6 +24,9 @@ The whole loop on the demo, with the kit's own agents. Lab-tested only (logtest,
 - Metrics count disabled SIDs and suppressed contexts as never visible; demo signature text for the fictional SIDs; real rule revisions
   in the demo data (the triage agent caught the mismatch).
 - Fix: the sensor-lab test used a fixed date that fell out of the 7-day window a week after release.
+- GitHub: issue forms (bug, tuning that hides an attack), PR template with an evidence checklist, security
+  reports routed to private advisories; README repository map; `make help` lists `test-sensor-ssh`; plugin
+  version 1.0.0.
 
 ## v0.1.0 - 2026-11-08
 

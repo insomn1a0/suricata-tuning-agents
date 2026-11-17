@@ -1,6 +1,8 @@
 # suricata-tuning-agents
 
 [![ci](https://github.com/insomn1a0/suricata-tuning-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/insomn1a0/suricata-tuning-agents/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/insomn1a0/suricata-tuning-agents)](CHANGELOG.md)
+[![license](https://img.shields.io/github/license/insomn1a0/suricata-tuning-agents)](LICENSE)
 
 An agent-assisted, evidence-first workflow for tuning **Suricata → Wazuh** alerts: cut the noise analysts
 see every day **without hiding attacks** - and prove it with tests.
@@ -121,6 +123,7 @@ git clone https://github.com/insomn1a0/suricata-tuning-agents && cd suricata-tun
 make demo                     # synthetic two weeks -> snapshots -> diff; no sensor, no Docker
 make venv lint test-unit      # PyYAML for intents; static checks
 make test-logtest test-pcap test-e2e test-e2e-mutant   # engines in throwaway containers (--network none)
+make help                     # every target in one line each
 ```
 
 **On your own sensor** you need a read-only ssh account (key-based), Docker and
@@ -128,6 +131,23 @@ make test-logtest test-pcap test-e2e test-e2e-mutant   # engines in throwaway co
 install it as a plugin in an empty directory (`/plugin marketplace add insomn1a0/suricata-tuning-agents`, then
 `/plugin install suricata-tuning@suricata-tuning-agents`). Onboarding interviews you, writes the git-ignored
 `config/environment.env` and `inventory/hosts.md`, checks access read-only and takes the first snapshot.
+The sensor administrator's side - account, ACLs, forced command - is in
+[`deploy/sensor/README.md`](deploy/sensor/README.md).
+
+## Repository map
+
+| Path | What is there |
+|---|---|
+| [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md) | the whole loop on the demo, step by step, with real output |
+| [`docs/PROCESS.md`](docs/PROCESS.md) · [`docs/PLAYBOOK.md`](docs/PLAYBOOK.md) · [`docs/SAFETY.md`](docs/SAFETY.md) | roles and decision classes · lessons · limits |
+| [`docs/WRITEUP.md`](docs/WRITEUP.md) | what the tests and reviews caught while building it |
+| [`.claude/agents/`](.claude/agents/) · [`.claude/skills/`](.claude/skills/) | agent roles and step-by-step procedures (plain Markdown) |
+| [`tuning/intents/`](tuning/intents/) | one YAML per tuning decision; [`tuning/schema.json`](tuning/schema.json) |
+| [`wazuh/`](wazuh/README.md) · [`suricata/`](suricata/README.md) · [`wazuh5/`](wazuh5/GAPS.md) | rules: hand-written ladder, generated tuning, rule-ID registry |
+| [`examples/cards/`](examples/cards/) | triage cards for every demo SID |
+| [`tests/corpus/`](tests/corpus/) | attack and benign pcaps, mutant intents |
+| [`deploy/sensor/`](deploy/sensor/README.md) | read-only account and ForceCommand for the sensor |
+| [`tools/`](tools/) | snapshot, diff, render, lint, metrics, test runners |
 
 ## Safety
 

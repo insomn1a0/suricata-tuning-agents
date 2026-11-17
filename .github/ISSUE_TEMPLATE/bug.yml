@@ -1,0 +1,36 @@
+name: Bug
+description: A make target, script, generated rule or agent procedure does the wrong thing
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Lab data only: 10.10.0.0/16, 192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24, `*.lab.local`.
+        Do not paste addresses, hostnames or EVE lines from a real network.
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      placeholder: make test-e2e
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened and what you expected
+      description: The relevant output, trimmed. For a wrong rule, the intent YAML and the logtest case.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Kit version or commit
+      placeholder: v1.0.0 / 3bdda6e
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: OS, Python, Docker; Suricata / Wazuh versions if not the pinned ones.
