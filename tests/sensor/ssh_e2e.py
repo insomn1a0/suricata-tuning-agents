@@ -109,9 +109,11 @@ def main():
                                              'WORK_HOURS="8-19"\n')
         sh("docker", "run", "-d", "--name", client, "--network", net, "--entrypoint", "sleep",
            "-v", f"{ROOT / 'tools'}:/src/tools:ro", "-v", f"{cfg}:/lab:ro", IMAGE, "infinity", check=True)
-        sh("docker", "exec", "-u", "analyst", client, "bash", "-c",
-           "mkdir -p ~/.ssh ~/kit/config && cp /lab/id /lab/known_hosts /lab/config ~/.ssh/ && chmod 600 ~/.ssh/* "
-           "&& cp -r /src/tools ~/kit/ && cp /lab/environment.env ~/kit/config/", check=True)
+        # copied as root: on Linux the mounted key keeps the host uid and mode 0600, unreadable for analyst
+        sh("docker", "exec", client, "bash", "-c",
+           "h=/home/analyst && mkdir -p $h/.ssh $h/kit/config && cp /lab/id /lab/known_hosts /lab/config $h/.ssh/ "
+           "&& cp -r /src/tools $h/kit/ && cp /lab/environment.env $h/kit/config/ "
+           "&& chown -R analyst:analyst $h/.ssh $h/kit && chmod 700 $h/.ssh && chmod 600 $h/.ssh/*", check=True)
 
         def ssh(command, *opts, stdin=None):
             return sh("docker", "exec", "-i", "-u", "analyst", client, "ssh", *opts, "lab-sensor", command,
